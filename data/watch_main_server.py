@@ -42,8 +42,8 @@ def probe():
     """探测主服务器 daily 接口，通返回 True"""
     try:
         import tushare as ts
-        import yaml
-        cfg = yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))["data"]
+        from data.config import load_params
+        cfg = load_params().get("data", {})
         p = ts.pro_api(cfg["tushare_token"])
         p._DataApi__http_url = cfg.get("tushare_api_url", "https://api.tushare.pro")
         d = p.daily(trade_date=time.strftime("%Y%m%d"))

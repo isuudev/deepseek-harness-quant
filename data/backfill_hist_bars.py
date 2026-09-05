@@ -72,8 +72,8 @@ def load_trade_days(pro):
 
 
 def _load_data_cfg():
-    import yaml
-    return yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))["data"]
+    from data.config import load_params
+    return load_params().get("data", {})
 
 
 def _backup_trade_days():

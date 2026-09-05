@@ -56,7 +56,8 @@ for mod, _ in modules:
 
 # ---------- 2. params.yaml 配置一致性 ----------
 print("=== 2. params.yaml 配置检查 ===")
-cfg = yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))
+from data.config import load_params
+cfg = load_params()
 # 2a. 关键段存在
 for sec in ["data", "factors", "defense", "pead", "weights", "risk", "regime", "pools", "backtest"]:
     check(f"配置段 [{sec}]", sec in cfg, f"缺失: {sec}")

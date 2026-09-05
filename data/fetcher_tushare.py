@@ -25,10 +25,8 @@ _MIN_INTERVAL = 0.05  # 主服务器宽松节流（实测单次 ~1s，此值仅�
 
 
 def _load_cfg():
-    import yaml
-    cfg = yaml.safe_load((Path(__file__).resolve().parent.parent / "config" / "params.yaml")
-                         .read_text(encoding="utf-8"))
-    return cfg["data"]
+    from data.config import load_params
+    return load_params().get("data", {})
 
 
 def _pro():

@@ -31,8 +31,10 @@ sys.path.insert(0, str(BASE))
 import akshare as ak
 import yaml
 
-CFG = yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))
-CACHE_DIR = CFG["data"]["cache_dir"]
+from data.config import load_params
+from data.cache import CACHE_DIR
+
+CFG = load_params()
 
 
 def norm(code):

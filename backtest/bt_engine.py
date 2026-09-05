@@ -39,8 +39,9 @@ from risk.stop_rules import StopRules
 from strategy.stock_state import classify_series
 from strategy.breakout_confirm import breakout_filter
 from backtest.core import COST_PER_SIDE, period_backtest, compute_metrics
+from data.config import load_params
 
-CFG = yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))
+CFG = load_params()
 MV_MAP_CSV = str(CACHE_DIR / "circ_mv_map.csv")
 
 # 分类策略参数（params.yaml stock_state/layers 可覆盖）

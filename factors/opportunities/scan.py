@@ -99,8 +99,8 @@ def batch_check_one(code: str) -> dict:
 
 
 def _load_data_cfg():
-    import yaml
-    return yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))["data"]
+    from data.config import load_params
+    return load_params().get("data", {})
 
 
 def load_valuation(date: str = None) -> dict:

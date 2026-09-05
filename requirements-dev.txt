@@ -1,0 +1,3 @@
+# 开发/测试依赖（本地 `pip install -r requirements.txt -r requirements-dev.txt`）
+# CI 单独装核心测试依赖，避免拉取数据源库（baostock/akshare/tushare）。
+pytest>=7.0

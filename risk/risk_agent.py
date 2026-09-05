@@ -64,8 +64,13 @@ class RiskAgent:
 
     # ---------- 审核（原文 check_order 完整逻辑）----------
     def check_order(self, symbol: str, size: float, current_portfolio: dict,
-                    current_drawdown: float, sector: str = "") -> RiskCheckResult:
-        """审核订单请求 → APPROVE / REDUCE(缩小) / REJECT"""
+                    current_drawdown: float, sector: str = "",
+                    sector_map: dict = None) -> RiskCheckResult:
+        """审核订单请求 → APPROVE / REDUCE(缩小) / REJECT
+
+        sector: 当前 symbol 所属行业；sector_map: {symbol: sector} 用于聚合同行业仓位
+        （无 sector_map 时跳过行业集中度检查，由调用方传入启用）。
+        """
         # ① 熔断检查
         if self.is_circuit_breaker_active:
             return self._result(Decision.REJECT, "熔断冷静期：禁止新建仓（只可减仓）")
@@ -86,10 +91,15 @@ class RiskAgent:
             if allowed <= 0:
                 return self._result(Decision.REJECT, f"标的 {symbol} 已达集中度上限 {self.max_symbol_exposure:.0%}")
             return self._result(Decision.REDUCE, f"标的集中度限制，缩小至 {allowed:.1%}", adjusted_size=allowed)
-        # ⑤ 行业集中度（有行业信息时）
+        # ⑤ 行业集中度（★修复：按 sector_map 聚合同行业仓位；原 k.startswith(sector) 用代码匹配行业名恒 False）
         if sector:
-            cur_sector = sum(v for k, v in current_portfolio.items() if k.startswith(sector))
-            if cur_sector + size > self.max_sector_exposure:
+            if sector_map:
+                cur_sector = sum(v for k, v in current_portfolio.items()
+                                 if sector_map.get(k) == sector)
+            else:
+                cur_sector = 0.0  # 无行业映射时无法聚合，跳过
+            # ★加 1e-9 容差：0.1*3=0.30000000000000004 不应误判超 0.30
+            if cur_sector + size > self.max_sector_exposure + 1e-9:
                 allowed = self.max_sector_exposure - cur_sector
                 if allowed <= 0:
                     return self._result(Decision.REJECT, f"行业 {sector} 已达上限 {self.max_sector_exposure:.0%}")

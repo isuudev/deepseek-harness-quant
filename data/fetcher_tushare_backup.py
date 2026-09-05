@@ -22,12 +22,10 @@ _KEY = None
 def _cfg():
     global _BASE, _KEY
     if _BASE is None:
-        import yaml
-        cfg = yaml.safe_load((Path(__file__).resolve().parent.parent / "config" / "params.yaml")
-                             .read_text(encoding="utf-8"))
-        b = cfg["data"]["tushare_backup"]
-        _BASE = b["url"].rstrip("/")
-        _KEY = b["api_key"]
+        from data.config import load_params
+        b = load_params().get("data", {}).get("tushare_backup") or {}
+        _BASE = (b.get("url") or "").rstrip("/")
+        _KEY = b.get("api_key")
     return _BASE, _KEY
 
 

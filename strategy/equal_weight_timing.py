@@ -43,10 +43,8 @@ _MV_MAP = None
 def _load_cfg():
     """读 params.yaml strategy_v3 段（回测与实盘同源，改参数不改代码）"""
     try:
-        import yaml
-        cfg = yaml.safe_load((Path(__file__).resolve().parent.parent / "config" / "params.yaml")
-                             .read_text(encoding="utf-8"))
-        return (cfg or {}).get("strategy_v3", {}) or {}
+        from data.config import load_params
+        return load_params().get("strategy_v3", {}) or {}
     except Exception:
         return {}
 
@@ -170,10 +168,8 @@ def regime_cash(date, confirm=None, cooldown=None) -> float:
     # 回退：RegimeDetector（真实 OHLC）
     if confirm is None or cooldown is None:
         try:
-            import yaml as _yaml
-            cfg = _yaml.safe_load((Path(__file__).resolve().parent.parent /
-                                   "config" / "params.yaml").read_text(encoding="utf-8"))
-            rg = (cfg or {}).get("regime", {}) or {}
+            from data.config import load_params
+            rg = load_params().get("regime", {}) or {}
         except Exception:
             rg = {}
         confirm = confirm if confirm is not None else rg.get("confirm_days", 5)

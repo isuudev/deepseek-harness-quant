@@ -120,11 +120,9 @@ def regime_cash_at(idx, me, confirm=None, cooldown=None):
     if len(hist) < 220:
         return 0.0
     if confirm is None or cooldown is None:
-        import yaml
         try:
-            cfg = yaml.safe_load((Path(__file__).resolve().parent.parent /
-                                  "config" / "params.yaml").read_text(encoding="utf-8"))
-            rg = (cfg or {}).get("regime", {}) or {}
+            from data.config import load_params
+            rg = load_params().get("regime", {}) or {}
             confirm = confirm if confirm is not None else rg.get("confirm_days", 20)
             cooldown = cooldown if cooldown is not None else rg.get("cooldown_days", 20)
         except Exception:

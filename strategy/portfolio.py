@@ -198,6 +198,41 @@ def _name_of(code: str):
         return None
 
 
+def _industry_of(code: str):
+    """风控行业集中度：从 stock_basic 查行业门类（首字母）；找不到返回空串"""
+    try:
+        import sqlite3
+        from data.cache import CACHE_DIR
+        con = sqlite3.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True, timeout=3)
+        try:
+            row = con.execute("SELECT industry FROM stock_basic WHERE code=?", (code,)).fetchone()
+            return str(row[0])[:1] if row and row[0] else ""
+        finally:
+            con.close()
+    except Exception:
+        return ""
+
+
+def _risk_gate(code: str, holdings: list, sector_map: dict):
+    """★风控门禁：买入决策必经 RiskAgent.check_order（一票否决）。
+    返回 (ok, reason)；REJECT → ok=False。
+    说明：等权 size=1/MAX_POSITIONS；用等权口径配置（单票上限=等权占比）避免等权 20% 误触发单笔 REDUCE，
+    核心生效项 = 行业集中度（同行业 >30% 拒绝）+ 总仓位；回撤熔断传 0（portfolio 无净值历史，接入 paper_account 时补）。"""
+    from risk.risk_agent import RiskAgent, Decision
+    size = 1.0 / MAX_POSITIONS
+    current_portfolio = {c: size for c in holdings}
+    sector = sector_map.get(code, "")
+    ra = RiskAgent({
+        "max_position_pct": size,
+        "max_symbol_exposure": size * 2,
+        "max_industry_pct": 0.30,
+        "max_total_exposure": 1.0,
+    })
+    r = ra.check_order(code, size, current_portfolio, 0.0, sector=sector, sector_map=sector_map)
+    # 等权无法缩小仓位 → REDUCE 也视为拒绝（仅 APPROVE 放行）
+    return (r.decision == Decision.APPROVE, r.reason)
+
+
 def stop_plan_for(otype, matrix: dict = None) -> dict:
     """按 otype 从止损矩阵 v2 生成 stop_plan（无 otype/矩阵缺失 → _default 兜底）"""
     matrix = matrix if matrix is not None else _load_stop_matrix()
@@ -230,7 +265,7 @@ def sync_from_decisions() -> dict:
     # ★2026-08-11 写保护免疫：deck_decisions 已是时间戳文件名，固定名可能不存在 → glob 取最新
     _dec = _latest_glob("deck_decisions_*.json", DECISIONS_JSON)
     if not _dec.exists():
-        return {"added": [], "over_limit": [], "skipped": []}
+        return {"added": [], "over_limit": [], "skipped": [], "rejected": []}
     decisions = json.loads(_dec.read_text(encoding="utf-8"))
     if not isinstance(decisions, list):
         decisions = []
@@ -240,12 +275,21 @@ def sync_from_decisions() -> dict:
     existing = {p["code"] for p in d["positions"] if p["status"] in ("holding", "over_limit")}
     risk = _risk_map()
     matrix = _load_stop_matrix()
-    added, over_limit, skipped = [], [], []
+    # ★风控门禁：当前 holding + 候选行业映射（RiskAgent.check_order 必经路径）
+    holdings = [p["code"] for p in d["positions"] if p["status"] == "holding"]
+    _cand = {r.get("code") for r in decisions if r.get("action") == "buy" and r.get("code")}
+    sector_map = {c: _industry_of(c) for c in (set(holdings) | _cand)}
+    added, over_limit, skipped, rejected = [], [], [], []
     for rec in decisions:
         if rec.get("action") != "buy":
             continue
         code = rec.get("code")
         if not code or code in existing:
+            continue
+        # ★风控门禁（RiskAgent.check_order 一票否决：行业集中度/总仓位/标的集中度）
+        _ok, _reason = _risk_gate(code, holdings, sector_map)
+        if not _ok:
+            rejected.append(code)
             continue
         # ★2026-08-12 十轮#172 防御：entry_date 早于最新交易日 7 天视为历史已完成（清零/复盘后不复位持仓）
         try:
@@ -280,8 +324,10 @@ def sync_from_decisions() -> dict:
             added.append(code)
         d["positions"].append(pos)
         existing.add(code)
+        if pos["status"] == "holding":
+            holdings.append(code)
     _save(d)
-    return {"added": added, "over_limit": over_limit, "skipped": skipped}
+    return {"added": added, "over_limit": over_limit, "skipped": skipped, "rejected": rejected}
 
 
 def sell(code: str, price: float = None, reason: str = "manual") -> dict:
@@ -332,7 +378,7 @@ if __name__ == "__main__":
     args = ap.parse_args()
     if args.sync:
         r = sync_from_decisions()
-        print(f"同步完成: 入持仓 {len(r['added'])} 只 {r['added']} | 超限拒绝 {r['over_limit']}")
+        print(f"同步完成: 入持仓 {len(r['added'])} 只 {r['added']} | 超限 {r['over_limit']} | 风控拒绝 {r['rejected']}")
     elif args.sell:
         code = args.sell[0]
         price = float(args.sell[1]) if len(args.sell) > 1 and args.sell[1] not in ("-", "None") else None
