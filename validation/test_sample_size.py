@@ -20,6 +20,7 @@ sys.path.insert(0, str(BASE))
 
 import numpy as np
 import pandas as pd
+from data.cache import CACHE_DIR
 from validation.substrategy_corr import load_closes, month_series, regime_cash_ma200
 
 
@@ -45,7 +46,7 @@ def main():
     codes = list(m_ret.columns)
     # 市值分层（circ_mv 快照，仅用于分层抽样——分层是抽样手段非过滤）
     mv = {}
-    mv_csv = Path(r"data/cache/circ_mv_map_full.csv")
+    mv_csv = CACHE_DIR / "circ_mv_map_full.csv"
     if mv_csv.exists():
         d = pd.read_csv(mv_csv, encoding="utf-8-sig")
         mv = {str(r.ts_code).upper(): float(r.circ_mv) / 10000 for r in d.itertuples()}

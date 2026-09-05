@@ -19,9 +19,9 @@ BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
 from data.fetcher_baostock import ensure_daily
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 
-BASIC_DB = r"data/cache/stock_basic.db"
+BASIC_DB = str(CACHE_DIR / "stock_basic.db")
 
 
 def load_codes():

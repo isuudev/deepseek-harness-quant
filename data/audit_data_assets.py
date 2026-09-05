@@ -20,8 +20,12 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-CACHE = Path(r"data/cache")
-REPORT = Path(__file__).resolve().parent.parent / "report"
+BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+CACHE = CACHE_DIR
+REPORT = BASE / "report"
 
 # 冷数据阈值：最新修改 > N 天未动视为冷
 COLD_DAYS = 30

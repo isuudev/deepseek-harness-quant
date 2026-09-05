@@ -25,14 +25,14 @@ sys.path.insert(0, str(BASE))
 import numpy as np
 import pandas as pd
 
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 from factors.classic_indicators import compute_all
 from validation.test_regime_classified import load_index, metrics, regime_cash_at, START, END
 
 COST = 0.00026 + 0.0005 + 0.001
 TOP_N = 10
 MIN_MV_YI = 50.0
-MV_MAP_CSV = Path(r"data/cache\circ_mv_map_full.csv")
+MV_MAP_CSV = CACHE_DIR / "circ_mv_map_full.csv"
 
 
 def load_panel():

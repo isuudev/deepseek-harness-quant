@@ -82,7 +82,8 @@ def review_batch(entries, batch_date=None):
         #   实测案例：08-10 批次 25 只 T+1 -1.73% vs 市场中位 -0.68%（16/25 跑输，非 beta）
         try:
             import sqlite3 as _sq3, statistics as _st3
-            _c3 = _sq3.connect("file:data/cache/bars.db?mode=ro&immutable=1",
+            from data.cache import CACHE_DIR
+            _c3 = _sq3.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1",
                                uri=True, timeout=3)
             _d0 = ents[0].get("entry_date", "")
             _t1date = t1s[0].get("date") if t1s and isinstance(t1s[0], dict) else ""

@@ -58,7 +58,8 @@ def _entry_price_of(code: str, date: str):
     审批买入价自动补——持仓有 entry_price 才能算收益/盈亏/收益率"""
     try:
         import sqlite3
-        con = sqlite3.connect("file:data/cache/bars.db?mode=ro&immutable=1",
+        from data.cache import CACHE_DIR
+        con = sqlite3.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1",
                               uri=True, timeout=3)
         row = con.execute(
             "SELECT close FROM daily_bar WHERE code=? AND date=? ORDER BY adjust DESC LIMIT 1",
@@ -77,12 +78,9 @@ def _latest_close_of(code: str):
         import sqlite3
         import glob as _glob
         from pathlib import Path as _P
-        paths = ["data/cache/bars.db"]
-        try:
-            from data.cache import CACHE_DIR
-            paths += [str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]
-        except Exception:
-            pass
+        from data.cache import CACHE_DIR
+        paths = [str(CACHE_DIR / "bars.db")]
+        paths += [str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]
         best = None
         for _p in paths:
             try:
@@ -189,7 +187,8 @@ def _name_of(code: str):
     """★#321 股票名兜底：从 stock_basic.db（全市场名表 5542 只，code→name）查；找不到返回 None"""
     try:
         import sqlite3
-        con = sqlite3.connect("file:data/cache/stock_basic.db?mode=ro&immutable=1", uri=True, timeout=3)
+        from data.cache import CACHE_DIR
+        con = sqlite3.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True, timeout=3)
         try:
             row = con.execute("SELECT name FROM stock_basic WHERE code=?", (code,)).fetchone()
             return row[0] if row else None

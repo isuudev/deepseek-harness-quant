@@ -21,7 +21,7 @@ import numpy as np
 import pandas as pd
 import sqlite3
 
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 from factors.factor_engine import FACTOR_FUNCS
 from strategy.stock_state import classify_series
 from strategy.breakout_confirm import breakout_filter
@@ -31,7 +31,7 @@ from strategy.style_timing import small_large_strength, pool_weight_shift
 START, END = "2020-01-01", "2025-12-31"
 COST = 0.00026 + 0.0005 + 0.001
 HARD_STOP, HIGH_DD = 0.07, 0.08
-MV_MAP_CSV = r"data/cache\circ_mv_map.csv"
+MV_MAP_CSV = str(CACHE_DIR / "circ_mv_map.csv")
 
 
 def load(limit=200):

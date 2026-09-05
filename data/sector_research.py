@@ -25,7 +25,10 @@ import numpy as np
 import pandas as pd
 
 BASE = Path(__file__).resolve().parent.parent
-CACHE = Path(r"data/cache")
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+CACHE = CACHE_DIR
 DAILY_PIVOT = BASE / "output" / "daily_close.parquet"
 HS300_PARQUET = BASE / "output" / "hs300_monthly.parquet"
 HORIZON = 20
@@ -72,7 +75,7 @@ def _to_bar_code(c):
 
 def _load_sector_detail():
     """code(带后缀) → (大类代码, 大类名称)；返回全量映射 + 大类列表"""
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
     rows = con.execute("SELECT code, industry FROM stock_basic WHERE industry!=''").fetchall()
     con.close()
     m = {}
@@ -284,7 +287,7 @@ def stock_search(q, limit=20):
     q = str(q or "").strip()
     if not q:
         return []
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
     rows = con.execute(
         "SELECT code, name FROM stock_basic WHERE code LIKE ? OR name LIKE ? LIMIT ?",
         (f"%{q}%", f"%{q}%", limit)).fetchall()
@@ -317,7 +320,7 @@ def stock_factors(code):
 
     sec_map = _load_sector_detail()
     sc, sn = sec_map.get(code, ("", ""))
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
     row = con.execute("SELECT name FROM stock_basic WHERE code=?", (code,)).fetchone()
     con.close()
     name = row[0] if row else ""
@@ -371,7 +374,7 @@ def sector_pitch(sector, topn=20, strong_factors=None):
     bn = _break_net().sort_values("day").drop_duplicates(subset="code", keep="last").set_index("code")
 
     # 散户涌入排雷（因子池研究 2026-08-15：户数大增=散户追涨 → 剔除）
-    con = sqlite3.connect(r"data/cache/gdhs_full.db")
+    con = sqlite3.connect(str(CACHE_DIR / "gdhs_full.db"))
     gd = pd.read_sql("SELECT code, chg_pct, ann_date FROM gdhs", con)
     con.close()
     gd["code"] = gd["code"].astype(str).str[:6]
@@ -384,7 +387,7 @@ def sector_pitch(sector, topn=20, strong_factors=None):
     if not strong_names:
         return {"ok": True, "n_total": len(codes), "n_pitch": 0, "strong_factors": [], "pitch": []}
 
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
     names = dict(con.execute("SELECT code, name FROM stock_basic").fetchall())
     con.close()
 
@@ -441,7 +444,7 @@ def sector_retail(sector, topn=20):
     if len(codes) < 5:
         return {"ok": False, "n": len(codes), "note": "板块成分不足"}
 
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
     names = dict(con.execute("SELECT code, name FROM stock_basic").fetchall())
     con.close()
 
@@ -449,7 +452,7 @@ def sector_retail(sector, topn=20):
     fr = _finance().sort_values("period").drop_duplicates(subset="code", keep="last").set_index("code")
 
     # 股东户数（每 code 最新一期）
-    con = sqlite3.connect(r"data/cache/gdhs_full.db")
+    con = sqlite3.connect(str(CACHE_DIR / "gdhs_full.db"))
     gd = pd.read_sql("SELECT code, chg_pct, ann_date FROM gdhs", con)
     con.close()
     gd["code"] = gd["code"].astype(str).str[:6]

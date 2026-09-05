@@ -27,7 +27,10 @@ import numpy as np
 import pandas as pd
 
 BASE = Path(__file__).resolve().parent.parent
-BARS_DB = r"data/cache/bars.db"
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
 PARQUET = BASE / "output" / "hs300_monthly.parquet"
 EQ_PARQUET = BASE / "output" / "eq_monthly.parquet"
 OUTPUT = BASE / "output" / "traffic_light.json"

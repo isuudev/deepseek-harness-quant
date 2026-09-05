@@ -25,7 +25,10 @@ import numpy as np
 import pandas as pd
 
 BASE = Path(__file__).resolve().parent.parent
-CACHE = Path(r"data/cache")
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+CACHE = CACHE_DIR
 DAILY_PIVOT = BASE / "output" / "daily_close.parquet"
 HS300_PARQUET = BASE / "output" / "hs300_monthly.parquet"
 HORIZON = 20          # 未来 20 交易日
@@ -54,7 +57,7 @@ SECTOR_MAP = {
 
 def _load_sector():
     """code(6位) → 板块门类（stock_basic.db 证监会行业）"""
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
     rows = con.execute("SELECT code, industry FROM stock_basic WHERE industry!=''").fetchall()
     con.close()
     return {str(r[0])[:6]: SECTOR_MAP.get(str(r[1])[:1], "其他") for r in rows}

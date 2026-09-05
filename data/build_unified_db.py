@@ -22,7 +22,10 @@ from datetime import datetime
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
-CACHE = Path(r"data/cache")
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+CACHE = CACHE_DIR
 UNIFIED = CACHE / "unified.db"
 OLD_FP = CACHE / "factor_pitch_perf.db"
 REPORT = BASE / "report"

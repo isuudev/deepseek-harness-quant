@@ -31,8 +31,9 @@ if str(BASE) not in sys.path:
     sys.path.insert(0, str(BASE))
 
 from factors.opportunities.score import size_tier_of   # ★2026-08-11 市值档位统一口径（券商指数划分）
+from data.cache import CACHE_DIR
 
-BARS_DB = Path(r"data/cache/bars.db")
+BARS_DB = CACHE_DIR / "bars.db"
 TECH_TOP_N = 6                 # ★2026-08-14 Pitch 改进规格 v2 ③：科技线每日 Top ≤6（原 14——同质化+无实证支撑）
                                #   （跨家族去重 + 竞价反信号过滤 + 昨板今收风控；F4 体检：limup 族 20 日无持续优势）
 LIMUP_DAYS = 5                 # 情绪窗口（近 5 日）
@@ -239,7 +240,7 @@ def build() -> Path:
     _MV = {}
     try:
         import sqlite3
-        con = sqlite3.connect(r"data/cache/finance.db", timeout=3)
+        con = sqlite3.connect(str(CACHE_DIR / "finance.db"), timeout=3)
         for row in con.execute("SELECT code, total_mv FROM valuation WHERE trade_date=(SELECT MAX(trade_date) FROM valuation)"):
             if row[1]:
                 _MV[str(row[0])] = row[1] / 10000.0   # 万元→亿

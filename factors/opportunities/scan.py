@@ -38,6 +38,7 @@ sys.path.insert(0, str(BASE))
 
 import numpy as np
 import pandas as pd
+from data.cache import CACHE_DIR
 
 from factors.opportunities.registry import OPPORTUNITY_TYPES, ORDER, SCORE_THRESHOLDS
 from factors.opportunities.score import (opportunity_score, gains_score, prob_score,
@@ -851,7 +852,7 @@ def _big_caps() -> set:
     out = set()
     try:
         import sqlite3 as _sq
-        con = _sq.connect("file:data/cache/hist_mv.db?mode=ro&immutable=1", uri=True)
+        con = _sq.connect(f"file:{CACHE_DIR / 'hist_mv.db'}?mode=ro&immutable=1", uri=True)
         m = con.execute("SELECT MAX(month) FROM hist_mv").fetchone()[0]
         vals = sorted(r[0] for r in con.execute(
             "SELECT circ_mv FROM hist_mv WHERE month=?", (m,)).fetchall())
@@ -1361,8 +1362,8 @@ def _amount_20d_yi(codes: set) -> dict:
         from pathlib import Path as _P
         import glob as _gl
         # 主库 + 最近 3 个增量库（immutable 只读，与 portfolio._latest_close_of 同款）
-        _dbs = ["data/cache/bars.db"] + \
-               sorted(_gl.glob("data/cache/bars_incr_*.db"))[-3:]
+        _dbs = [str(CACHE_DIR / "bars.db")] + \
+               sorted(_gl.glob(str(CACHE_DIR / "bars_incr_*.db")))[-3:]
         # 收集每 code 的 (date, amount_元) —— 增量库后写覆盖主库同日期
         _by_code = {c: {} for c in codes}
         for _db in _dbs:

@@ -41,10 +41,10 @@ sys.path.insert(0, str(BASE))
 import numpy as np
 import pandas as pd
 
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 from validation.substrategy_corr import load_closes, month_series
 
-CACHE = Path(r"data/cache")
+CACHE = CACHE_DIR
 MACRO_DB = CACHE / "macro.db"
 EPU_DB = CACHE / "policy" / "epu.db"
 
@@ -334,7 +334,7 @@ def main():
         #   ——连续仓位(中位0.2)大部分时间半仓以下，与满仓主义哲学冲突且浪费上涨
         cal = cond["calendar"]
         import sqlite3 as _s3
-        _con = _s3.connect(r"data/cache/bars.db")
+        _con = _s3.connect(str(CACHE_DIR / "bars.db"))
         _rows = _con.execute(
             "SELECT date, close FROM daily_bar WHERE code='SH.000300' AND adjust='none' ORDER BY date").fetchall()
         _con.close()

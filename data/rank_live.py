@@ -44,7 +44,9 @@ BASE = Path(__file__).resolve().parent.parent
 if str(BASE) not in sys.path:
     sys.path.insert(0, str(BASE))
 
-BARS_DB = r"data/cache/bars.db"
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
 TOP_N = 100          # 榜规模
 MIN_PRICE = 1.5      # 过滤仙股
 MIN_DAYS = 60        # 次新过滤
@@ -68,7 +70,7 @@ def _load_names():
     """code → name（stock_basic）"""
     try:
         import pandas as pd
-        con = _ro(r"data/cache/stock_basic.db")
+        con = _ro(str(CACHE_DIR / "stock_basic.db"))
         df = pd.read_sql("SELECT code, name FROM stock_basic", con)
         con.close()
         return dict(zip(df["code"], df["name"]))

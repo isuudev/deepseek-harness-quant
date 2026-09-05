@@ -30,8 +30,9 @@ sys.path.insert(0, str(BASE))
 
 import numpy as np
 import pandas as pd
+from data.cache import CACHE_DIR
 
-CACHE = Path(r"data/cache")
+CACHE = CACHE_DIR
 OUT = BASE / "output" / "factor_combo_report.json"
 
 TECH_FACTORS = ["lowvol_60", "mom_120", "mom_20", "near_high_250", "new_high_250"]

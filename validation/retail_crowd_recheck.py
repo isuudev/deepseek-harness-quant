@@ -1,10 +1,13 @@
 # -*- coding: utf-8 -*-
 """validation/retail_crowd_recheck.py — 复核因子池"热门板块×低换手 +21.71%"（T+1）"""
 import sys, sqlite3
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from data.cache import CACHE_DIR
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 import numpy as np, pandas as pd
 
-CACHE = r"data/cache"
+CACHE = str(CACHE_DIR)
 
 print("加载日线(qfq, baostock源=全市场+amount元)…", flush=True)
 con = sqlite3.connect(f"file:{CACHE}/bars.db?mode=ro&immutable=1", uri=True)
@@ -14,7 +17,7 @@ df["date"] = pd.to_datetime(df["date"])
 print(f"  {len(df)} 行, {df['code'].nunique()} 只", flush=True)
 
 # 行业（门类首字母）
-con = sqlite3.connect(r"data/cache/stock_basic.db")
+con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
 ind = pd.read_sql("SELECT code, industry FROM stock_basic", con)
 con.close()
 ind["code"] = ind["code"].astype(str)

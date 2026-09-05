@@ -24,7 +24,7 @@ sys.path.insert(0, str(BASE))
 import numpy as np
 import pandas as pd
 
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 from factors.classic_indicators import compute_all
 from validation.test_regime_classified import load_index, metrics, regime_cash_at, START, END
 from validation.test_classic_pool import load_panel, month_end_scores, backtest_score, combine_scores
@@ -82,7 +82,7 @@ def backtest_regime(score_df, closes, month_ends, idx, mv_map=None, min_mv_yi=0.
 
 def load_mv_map():
     mv = {}
-    p = Path(r"data/cache\circ_mv_map_full.csv")
+    p = CACHE_DIR / "circ_mv_map_full.csv"
     if p.exists():
         m = pd.read_csv(p, encoding="utf-8")
         col_code = "ts_code" if "ts_code" in m.columns else m.columns[0]

@@ -32,7 +32,9 @@ for k in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy",
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-QD_DB = Path(r"data/cache/finance_quality.db")
+from data.cache import CACHE_DIR
+
+QD_DB = CACHE_DIR / "finance_quality.db"
 PROGRESS = BASE / "logs" / "quality_progress.txt"
 FAILED = BASE / "logs" / "quality_failed.csv"
 QUARTERS = [("2025", q) for q in (1, 2, 3, 4)] + [("2026", q) for q in (1, 2)]
@@ -51,7 +53,7 @@ def _conn():
 
 
 def load_codes():
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
     codes = [r[0] for r in con.execute(
         "SELECT code FROM stock_basic WHERE code LIKE '%.SH' OR code LIKE '%.SZ'").fetchall()]
     con.close()

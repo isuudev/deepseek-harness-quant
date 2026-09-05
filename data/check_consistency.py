@@ -17,6 +17,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
 
 HOST = "http://127.0.0.1:8787"
 
@@ -152,7 +153,7 @@ def check() -> int:
     # 12) ★沪深300 基准（百轮#69）：portfolio_perf 基准数据可用
     try:
         import sqlite3
-        _con = sqlite3.connect("file:data/cache/bars.db?mode=ro&immutable=1", uri=True)
+        _con = sqlite3.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1", uri=True)
         _n_idx = _con.execute("SELECT COUNT(*) FROM daily_bar WHERE code='SH.000300'").fetchone()[0]
         _con.close()
     except Exception:
@@ -199,7 +200,7 @@ def check() -> int:
     try:
         import sqlite3 as _s17
         from pathlib import Path as _P17
-        _B17 = r"data/cache/bars.db"
+        _B17 = str(CACHE_DIR / "bars.db")
         _conns17 = [_s17.connect(f"file:{_B17}?mode=ro&immutable=1", uri=True, timeout=3)]
         try:
             for _p17 in sorted(_P17(_B17).parent.glob("bars_incr_*.db"))[-3:]:

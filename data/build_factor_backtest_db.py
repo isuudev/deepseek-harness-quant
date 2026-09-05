@@ -30,9 +30,11 @@ import numpy as np
 import pandas as pd
 
 BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
 DAILY_DIR = Path("data/factorpool/output/daily_scores")
-BARS_DB = r"data/cache/bars.db"
-OUT_DB = r"data/cache/unified.db"
+BARS_DB = str(CACHE_DIR / "bars.db")
+OUT_DB = str(CACHE_DIR / "unified.db")
 TOP_FRAC = 0.20   # 因子多头 = rank 前 20%（★#384 好因子 rank 大，前 20% = rank ≥ 1-TOP_FRAC=0.80）
 
 

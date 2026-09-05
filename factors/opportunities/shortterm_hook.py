@@ -23,6 +23,8 @@ BASE = Path(__file__).resolve().parent.parent.parent
 if str(BASE) not in sys.path:
     sys.path.insert(0, str(BASE))
 
+from data.cache import CACHE_DIR
+
 EXT_POOL_DIR = Path(r"data/factorpool/output/daily_scores")
 
 _cache = {"ts": 0.0, "data": None}
@@ -159,8 +161,8 @@ def one_word_disclosure(entries: list) -> int:
         import sqlite3
         import glob as _glob
         from pathlib import Path as _P
-        _db_paths = ["data/cache/bars.db"] + [
-            str(p) for p in sorted(_P("data/cache").glob("bars_incr_*.db"))[-3:]]
+        _db_paths = [str(CACHE_DIR / "bars.db")] + [
+            str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]
         n = 0
         for e in entries:
             code, d = e.get("code"), e.get("add_date") or e.get("entry_date")

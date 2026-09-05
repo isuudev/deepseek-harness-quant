@@ -32,7 +32,9 @@ import pandas as pd
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-BARS_DB = r"data/cache/bars.db"
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
 PORTFOLIO = BASE / "logs" / "portfolio.json"
 DECISIONS = BASE / "logs" / "deck_decisions.json"
 PITCH_V2 = BASE / "logs" / "pitch_v2.json"
@@ -98,7 +100,7 @@ def _stock_name(code: str) -> str:
     global _stock_name_cache
     if _stock_name_cache is None:
         try:
-            _bc = sqlite3.connect("file:data/cache/stock_basic.db?mode=ro&immutable=1", uri=True, timeout=3)
+            _bc = sqlite3.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True, timeout=3)
             _stock_name_cache = dict(_bc.execute("SELECT code, name FROM stock_basic").fetchall())
             _bc.close()
         except Exception:

@@ -19,6 +19,8 @@ BASE = Path(__file__).resolve().parent.parent
 if str(BASE) not in sys.path:
     sys.path.insert(0, str(BASE))
 
+from data.cache import CACHE_DIR
+
 _fwd_cache = {"ts": 0, "data": None}
 _cal_cache = {"ts": 0, "data": None}   # ★#150 日历缓存（数据源版本 5min）
 _alrt_cache = {"ts": 0, "data": None}  # ★#150 预警缓存（数据源版本 2min）
@@ -60,7 +62,7 @@ def _bars_version() -> float:
     """数据源版本 = bars.db + 增量库的最新 mtime（★0.01s；MAX(date) 全表扫 900 万行要 1s+）"""
     try:
         import glob as _g
-        fs = [r"data/cache/bars.db"] + _g.glob(r"data/cache/bars_incr_*.db")
+        fs = [str(CACHE_DIR / "bars.db")] + _g.glob(str(CACHE_DIR / "bars_incr_*.db"))
         mt = [os.path.getmtime(f) for f in fs if os.path.exists(f)]
         return max(mt) if mt else 0.0
     except Exception:
@@ -100,8 +102,8 @@ def live_forward(force: bool = False) -> dict:
         try:
             import sqlite3 as _sq2
             from pathlib import Path as _P3
-            for _p in (["data/cache/bars.db"] +
-                       [str(p) for p in sorted(_P3("data/cache").glob("bars_incr_*.db"))[-3:]]):
+            for _p in ([str(CACHE_DIR / "bars.db")] +
+                       [str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]):
                 try:
                     con = _sq2.connect(_P3(_p).as_uri() + "?mode=ro&immutable=1",
                                        uri=True, timeout=3)
@@ -424,7 +426,7 @@ def live_holdings() -> dict:
     #   stock_basic 匹配；名称缺失曾导致持仓显示为裸 code）
     try:
         import sqlite3 as _sq
-        _con = _sq.connect("file:data/cache/stock_basic.db?mode=ro&immutable=1", uri=True, timeout=3)
+        _con = _sq.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True, timeout=3)
         for _p in pf.get("positions", []):
             _c = _p.get("code", "")
             if not _p.get("name") or _p["name"] == _c:
@@ -932,7 +934,7 @@ def live_funnel() -> dict:
     bars_rows = None
     try:
         import sqlite3 as _sq
-        _c = _sq.connect("file:data/cache/bars.db?mode=ro&immutable=1", uri=True, timeout=3)
+        _c = _sq.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1", uri=True, timeout=3)
         bars_rows = _c.execute("SELECT COUNT(*) FROM daily_bar WHERE adjust='qfq' AND code != 'SH.000300'").fetchone()[0]
         _c.close()
     except Exception:
@@ -1041,7 +1043,7 @@ def live_turnlow_top(top_n: int = 20) -> dict:
         # 名字映射
         names = {}
         try:
-            con = _sq.connect("file:data/cache/stock_basic.db?mode=ro&immutable=1", uri=True)
+            con = _sq.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True)
             names = dict(con.execute("SELECT code, name FROM stock_basic").fetchall())
             con.close()
         except Exception:
@@ -1076,8 +1078,8 @@ def portfolio_perf() -> dict:
         # ★#69 双库合并（主库 + 最近 3 个增量库 immutable）
         def _dbs():
             import glob as _g
-            dbs = ["data/cache/bars.db"]
-            inc = sorted(_g.glob("data/cache/bars_incr_*.db"))[-3:]
+            dbs = [str(CACHE_DIR / "bars.db")]
+            inc = sorted(_g.glob(str(CACHE_DIR / "bars_incr_*.db")))[-3:]
             return dbs + inc
         def _ro(p):
             return f"{_P(p).as_uri()}?mode=ro&immutable=1"
@@ -1394,8 +1396,8 @@ def live_calendar() -> dict:
         import glob as _g2
         from pathlib import Path as _P2
         _dayset = set()
-        _db_paths = ["data/cache/bars.db"] + [
-            str(p) for p in sorted(_P2("data/cache").glob("bars_incr_*.db"))[-3:]]
+        _db_paths = [str(CACHE_DIR / "bars.db")] + [
+            str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]
         for _p in _db_paths:
             try:
                 con = sqlite3.connect(_P2(_p).as_uri() + "?mode=ro&immutable=1",
@@ -1766,7 +1768,7 @@ def _batch_review_payload(entries: list) -> dict:
             if _key in _mkt_median_cache:
                 return _mkt_median_cache[_key]
             try:
-                _c4 = _sq4.connect("file:data/cache/bars.db?mode=ro&immutable=1",
+                _c4 = _sq4.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1",
                                    uri=True, timeout=3)
                 _a = dict(_c4.execute(
                     "SELECT code, close FROM daily_bar WHERE date=? AND adjust='qfq'", (d0,)).fetchall())
@@ -2175,7 +2177,7 @@ def live_factor_perf() -> dict:
     if _c and _t.time() - _c[0] < 300:
         return _c[1]
     out = {"ok": False, "err": "unified.db 未建成"}
-    db = Path(r"data/cache/unified.db")
+    db = CACHE_DIR / "unified.db"
     if not db.exists():
         return out
     try:
@@ -2215,7 +2217,7 @@ def live_factor_ranking() -> dict:
         # 1. 读证据权重配置（evidence_weights 表）
         backtest_w, live_w, min_live, boost = 1.0, 0.4, 20.0, 1.2
         try:
-            con = _sq.connect("file:data/cache/unified.db?mode=ro&immutable=1", uri=True, timeout=3)
+            con = _sq.connect(f"file:{CACHE_DIR / 'unified.db'}?mode=ro&immutable=1", uri=True, timeout=3)
             for k, v in con.execute("SELECT key, value FROM evidence_weights").fetchall():
                 try:
                     if k == "backtest_w": backtest_w = float(v)
@@ -2304,7 +2306,7 @@ def live_db_view() -> dict:
     import sqlite3 as _sq
     out = {"ok": True, "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "tables": {}, "ranking": []}
     try:
-        con = _sq.connect("file:data/cache/unified.db?mode=ro&immutable=1", uri=True, timeout=3)
+        con = _sq.connect(f"file:{CACHE_DIR / 'unified.db'}?mode=ro&immutable=1", uri=True, timeout=3)
         for tbl, name in (("factor_agg", "因子实战聚合"), ("factor_pitch", "因子×Pitch 明细"),
                           ("factor_backtest", "因子全量回测（top20%→T+1）"),
                           ("evidence_weights", "证据权重配置"), ("market_daily", "市场日线快照")):
@@ -2473,7 +2475,7 @@ def live_strong_hits() -> dict:
         from factors.opportunities.scan import load_strong_hits
         hits = load_strong_hits()
         import sqlite3 as _sq
-        con = _sq.connect("file:data/cache/stock_basic.db?mode=ro&immutable=1", uri=True)
+        con = _sq.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True)
         meta = {r[0]: (r[1], r[2] or "") for r in con.execute(
             "SELECT code, name, industry FROM stock_basic").fetchall()}
         con.close()
@@ -2533,7 +2535,7 @@ def live_auction() -> dict:
         d8 = sorted(sig.keys())[-1]
         day = sig[d8]
         import sqlite3 as _sq
-        con = _sq.connect("file:data/cache/stock_basic.db?mode=ro&immutable=1", uri=True)
+        con = _sq.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True)
         meta = {r[0]: (r[1], r[2] or "") for r in con.execute(
             "SELECT code, name, industry FROM stock_basic").fetchall()}
         con.close()
@@ -3068,7 +3070,7 @@ def live_data_assets() -> dict:
            "tables": [], "inventory": [], "lineage": []}
     try:
         import sqlite3 as _sq
-        _con = _sq.connect("file:data/cache/unified.db?mode=ro&immutable=1",
+        _con = _sq.connect(f"file:{CACHE_DIR / 'unified.db'}?mode=ro&immutable=1",
                            uri=True, timeout=3)
         _cur = _con.cursor()
         for (t,) in _cur.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall():

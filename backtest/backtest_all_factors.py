@@ -16,9 +16,10 @@ import pandas as pd
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 from backtest.bt_report import archive, compute_metrics
+from data.cache import CACHE_DIR
 
-BARS = "data/cache/bars.db"
-MV = "data/cache/hist_mv.db"
+BARS = str(CACHE_DIR / "bars.db")
+MV = str(CACHE_DIR / "hist_mv.db")
 COST = 0.004
 TOP = 0.10
 t0 = time.time()

@@ -17,13 +17,16 @@ import time
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE))
+
+from data.cache import CACHE_DIR
 
 DBS = {
-    "bars": r"data/cache/bars.db",
-    "finance": r"data/cache/finance.db",
-    "finance_quality": r"data/cache/finance_quality.db",
-    "minute": r"data/cache/minute.db",
-    "hist_mv": r"data/cache/hist_mv.db",
+    "bars": str(CACHE_DIR / "bars.db"),
+    "finance": str(CACHE_DIR / "finance.db"),
+    "finance_quality": str(CACHE_DIR / "finance_quality.db"),
+    "minute": str(CACHE_DIR / "minute.db"),
+    "hist_mv": str(CACHE_DIR / "hist_mv.db"),
 }
 
 SCHEDULED_TASKS = [

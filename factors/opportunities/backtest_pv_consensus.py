@@ -27,8 +27,9 @@ import numpy as np
 import pandas as pd
 
 from factors.opportunities.backtest_winrate import _add_months
+from data.cache import CACHE_DIR
 
-BARS_DB = r"data/cache/bars.db"
+BARS_DB = str(CACHE_DIR / "bars.db")
 OUT = BASE / "logs" / "pv_consensus_winrates.json"
 
 FIVE = ["turn_mid_prox", "sentiment", "turnover", "reversal20", "lowvol"]

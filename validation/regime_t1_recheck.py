@@ -22,7 +22,8 @@ import pandas as pd
 
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
-CACHE = Path(r"data/cache")
+from data.cache import CACHE_DIR
+CACHE = CACHE_DIR
 
 
 def load_eq_full():

@@ -11,7 +11,9 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-BASE = Path(r".")
+BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
 
@@ -42,7 +44,7 @@ for e in entries:
 print(f"有 T+1 记录: {len(recs)}")
 
 # 市场 T+1 中位数（每入池日 → 次日全市场收益中位，与 pitch_review 同口径）
-con = sqlite3.connect("file:data/cache/bars.db?mode=ro&immutable=1", uri=True)
+con = sqlite3.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1", uri=True)
 mkt = {}
 for r in recs:
     d0, d1 = r["d0"], ""

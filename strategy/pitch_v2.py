@@ -28,11 +28,12 @@ BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
 import numpy as np
+from data.cache import CACHE_DIR
 
 OP_POOL_GLOB = BASE / "logs" / "opp_pool_*.json"
 DECK_OUT = BASE / "logs" / f"pitch_deck_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
 DECISIONS = BASE / "logs" / "deck_decisions.json"
-BARS_DB = r"data/cache/bars.db"
+BARS_DB = str(CACHE_DIR / "bars.db")
 
 
 def get_latest_pool() -> Path:

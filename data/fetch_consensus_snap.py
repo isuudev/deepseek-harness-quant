@@ -18,7 +18,11 @@ from pathlib import Path
 
 import pandas as pd
 
-DB = Path(r"data/cache/consensus_snap.db")
+BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+DB = CACHE_DIR / "consensus_snap.db"
 # akshare stock_profit_forecast_em 返回列（东方财富口径，按列名前缀取）
 KEEP_PREFIX = ("代码", "名称", "最新评级", "目标均价", "预测年报每股收益")
 

@@ -30,7 +30,9 @@ sys.path.insert(0, str(BASE))
 
 import pandas as pd
 
-BARS_DB = r"data/cache/bars.db"
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
 LOG_FILE = BASE / "logs" / "convert_raw.log"
 # ★本地 adj_factor parquet 目录（用户下载的 Tushare 历史包）
 ADJ_DIR = Path(r"data/minute/download/tushare_15000_history_by_api_packages_20260627/adj_factor/adj_factor/data")

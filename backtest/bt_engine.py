@@ -38,14 +38,15 @@ from risk.risk_agent import RiskAgent
 from risk.stop_rules import StopRules
 from strategy.stock_state import classify_series
 from strategy.breakout_confirm import breakout_filter
+from backtest.core import COST_PER_SIDE, period_backtest, compute_metrics
 
 CFG = yaml.safe_load((BASE / "config" / "params.yaml").read_text(encoding="utf-8"))
-MV_MAP_CSV = r"data/cache/circ_mv_map.csv"
+MV_MAP_CSV = str(CACHE_DIR / "circ_mv_map.csv")
 
 # 分类策略参数（params.yaml stock_state/layers 可覆盖）
 HARD_STOP = CFG.get("risk", {}).get("stop_loss_pct", 0.07)
 HIGH_DD = CFG.get("risk", {}).get("high_drawdown_exit", 0.08)
-COST = 0.00026 + 0.0005 + 0.001
+COST = COST_PER_SIDE
 
 
 class BtEngine:
@@ -117,11 +118,12 @@ class BtEngine:
             return None
 
     def backtest_direction(self, closes: pd.DataFrame, direction: dict,
-                           cost: float = COST) -> dict:
-        """方向化因子回测：每月末排名 → Top N 等权，含成本
+                           cost: float = COST, opens=None, highs=None) -> dict:
+        """方向化因子回测：每月末排名 → Top N 等权（统一 T+1 open + 一字板 + 真实成本）。
 
         direction: 因子方向表（factors/direction 或自定义）
-        cost: 佣金万2.6 + 印花税0.05%(卖) + 滑点0.1%
+        cost: 单边成本率（每次全换仓扣 2×，发生在换仓日）
+        opens/highs: 可选，提供时启用 T+1 open 买入 + 一字板过滤（否则降级 close-to-close）
         """
         # 因子面板（方向化，越大越好）
         panels = {}
@@ -134,47 +136,16 @@ class BtEngine:
             raise ValueError("无有效因子")
 
         # 综合分（等权合并各因子，先归一化排名）
-        # ★用 DataFrame 累加（Series+DataFrame 会按 index 广播错位，产生多余列）
         score = pd.DataFrame(0.0, index=closes.index, columns=closes.columns)
-        factor_ranks = {}
         for name, p in panels.items():
-            rank = p.rank(axis=1, pct=True)   # 每日期截面排名 0-1
-            factor_ranks[name] = rank
-            score = score + rank
+            score = score + p.rank(axis=1, pct=True)   # 每日期截面排名 0-1
         score = score / len(panels)
 
-        # 月末截面调仓（T+1：信号月末生成，次月首个交易日执行）
-        ym = closes.index.astype(str).str[:7]
-        month_ends = pd.Series(closes.index).groupby(ym).max().tolist()
-        # 日期比较统一转字符串（兼容 datetime/str 两种索引）
-        s, e = str(self.start)[:10], str(self.end)[:10]
-        month_ends = [d for d in month_ends if s <= str(d)[:10] <= e]
-
-        # 组合收益：Top N 等权
-        ret = pd.Series(0.0, index=closes.index)
-        turnover_cost_total = 0.0
-        for i, me in enumerate(month_ends):
-            pos = closes.index.get_loc(me)
-            if pos < 120:
-                continue
-            scores = score.iloc[pos].dropna()
-            if len(scores) < self.topn:
-                continue
-            picks = scores.nlargest(self.topn).index
-            # 次月区间收益（T+1：从下个交易日开始）
-            nxt = month_ends[i + 1] if i + 1 < len(month_ends) else self.end
-            nxt_pos = closes.index.get_loc(nxt) if nxt in closes.index else len(closes) - 1
-            seg = closes.iloc[pos + 1: nxt_pos + 1].pct_change().fillna(0)
-            if len(seg) == 0:
-                continue
-            ret.loc[seg.index] = seg[picks].mean(axis=1)
-            turnover_cost_total += cost * 2  # 每月全换仓（买+卖）
-
-        # 扣除成本（按调仓次数分摊到日）
-        n_days = len(ret)
-        ret_net = ret - turnover_cost_total / n_days if n_days > 0 else ret
-
-        return self._metrics(ret_net, turnover_cost_total, len(month_ends))
+        # 统一调仓回测（T+1 open 买入 + 一字板过滤 + 真实换手成本）
+        ret = period_backtest(closes, opens, highs, score, self.topn,
+                              rebalance="M", cost_per_side=cost)
+        n_months = len(pd.Series(ret.index.astype(str).str[:7]).unique())
+        return self._metrics(ret, cost, n_months)
 
     def backtest_classified(self, panel, closes, use_mv_pool=True, use_breakout=True,
                             mv_map=None) -> dict:
@@ -312,12 +283,12 @@ class BtEngine:
 
     @staticmethod
     def _metrics(ret_net, cost, n_months):
-        eq = (1 + ret_net).cumprod()
-        total = eq.iloc[-1] - 1
-        annual = (1 + total) ** (252 / max(len(ret_net), 1)) - 1
-        dd = ((eq - eq.cummax()) / eq.cummax()).min()
-        sharpe = ret_net.mean() / ret_net.std() * np.sqrt(252) if ret_net.std() > 0 else 0
-        return {"total": total, "annual": annual, "max_dd": dd, "sharpe": sharpe,
+        """统一指标口径（委托 backtest/core 的 compute_metrics），保留旧字段名供调用方兼容。"""
+        m = compute_metrics(ret_net)
+        return {"total": m.get("total_return", 0.0),
+                "annual": m.get("annual_return", 0.0),
+                "max_dd": m.get("max_drawdown", 0.0),
+                "sharpe": m.get("sharpe", 0.0),
                 "turnover_cost": cost, "n_months": n_months, "returns": ret_net}
 
     def run_comparison(self, codes, limit=100):
@@ -370,7 +341,7 @@ def main():
     args = ap.parse_args()
 
     import sqlite3
-    con = sqlite3.connect(str(CFG["data"]["cache_dir"] + "/bars.db"))
+    con = sqlite3.connect(str(CACHE_DIR / "bars.db"))
     codes = [r[0] for r in con.execute(
         "SELECT DISTINCT code FROM daily_bar WHERE code NOT LIKE 'sh.%' AND code NOT LIKE 'sz.%'")]
     con.close()

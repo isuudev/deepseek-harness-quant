@@ -25,9 +25,11 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 LOGS = BASE / "logs"
-DB = Path(r"data/cache/factor_pitch_perf.db")
 
 sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
+
+DB = CACHE_DIR / "factor_pitch_perf.db"
 
 
 def _pitch_files():

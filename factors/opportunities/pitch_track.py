@@ -38,7 +38,9 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent.parent   # factors/opportunities/ → deepseek-harness-quant
 sys.path.insert(0, str(BASE))
 
-BARS_DB = Path(r"data/cache/bars.db")
+from data.cache import CACHE_DIR
+
+BARS_DB = CACHE_DIR / "bars.db"
 FWD_HORIZONS = (1, 5, 20, 60)
 
 
@@ -363,7 +365,7 @@ def append_machine_top01(n_top: int = 5) -> dict:
     # ★2026-08-13 #321：机器池股票来自 ext_hits 共识（不在 pitch_v2）→ name 从全市场名表补
     _basic_names = {}
     try:
-        _bc = sqlite3.connect("file:data/cache/stock_basic.db?mode=ro&immutable=1", uri=True, timeout=3)
+        _bc = sqlite3.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True, timeout=3)
         _basic_names = dict(_bc.execute("SELECT code, name FROM stock_basic").fetchall())
         _bc.close()
     except Exception:
@@ -546,7 +548,7 @@ def append_niu_select(persona: str, picks: list, date: str = "",
     # 名称补全（stock_basic）
     _basic_names = {}
     try:
-        _bc = sqlite3.connect("file:data/cache/stock_basic.db?mode=ro&immutable=1",
+        _bc = sqlite3.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1",
                               uri=True, timeout=3)
         _basic_names = dict(_bc.execute("SELECT code, name FROM stock_basic").fetchall())
         _bc.close()

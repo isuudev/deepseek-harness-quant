@@ -19,12 +19,12 @@ sys.path.insert(0, str(BASE))
 import numpy as np
 import pandas as pd
 
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 from validation.test_regime_classified import (
     load_index, metrics, regime_cash_at, START, END,
 )
 
-MV_MAP_CSV = Path(r"data/cache\circ_mv_map_full.csv")
+MV_MAP_CSV = CACHE_DIR / "circ_mv_map_full.csv"
 
 
 def load_pool(limit=None):

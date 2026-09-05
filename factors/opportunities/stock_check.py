@@ -34,9 +34,11 @@ BASE = Path(__file__).resolve().parent.parent.parent
 if str(BASE) not in sys.path:
     sys.path.insert(0, str(BASE))
 
-BARS_DB = r"data/cache/bars.db"
-QD_DB = r"data/cache/finance_quality.db"
-BASIC_DB = r"data/cache/stock_basic.db"
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
+QD_DB = str(CACHE_DIR / "finance_quality.db")
+BASIC_DB = str(CACHE_DIR / "stock_basic.db")
 
 TYPE_CN = {
     "value": "低估值", "revalue": "价值重估", "quality_gap": "质量折价",
@@ -180,9 +182,7 @@ def _growth_metrics(code: str):
     """成长维度（finance_ts 最新财报）：净利同比 + ROE + 净资产增速"""
     try:
         import sqlite3 as sq
-        con = sq.connect(f"file:{BARS_DB.rsplit('/', 1)[0]}/finance_ts.db?mode=ro&immutable=1"
-                         if "/" in BARS_DB else
-                         "file:data/cache/finance_ts.db?mode=ro&immutable=1",
+        con = sq.connect(f"file:{CACHE_DIR / 'finance_ts.db'}?mode=ro&immutable=1",
                          uri=True, timeout=3)
         rows = con.execute(
             "SELECT ann_date, n_income, total_hldr_eqy_exc_min_int FROM financials_ts "

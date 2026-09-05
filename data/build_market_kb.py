@@ -23,10 +23,11 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
+from data.cache import CACHE_DIR
 LOGS = BASE / "logs"
 REPORT = BASE / "report"
 OUTPUT = BASE / "output"
-UNIFIED = Path(r"data/cache/unified.db")
+UNIFIED = CACHE_DIR / "unified.db"
 EXT_HS = Path(r"data/factorpool/output/health")
 
 TABLES = {
@@ -124,7 +125,7 @@ def load_market_width():
     try:
         from data.cache import DailyCache
         date = DailyCache().latest_trade_date()
-        con = sqlite3.connect("file:data/cache/bars.db?mode=ro&immutable=1", uri=True, timeout=5)
+        con = sqlite3.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1", uri=True, timeout=5)
         rows = con.execute(
             "SELECT SUM(CASE WHEN pct_chg>0 THEN 1 ELSE 0 END), SUM(CASE WHEN pct_chg<0 THEN 1 ELSE 0 END),"
             " SUM(CASE WHEN pct_chg=0 THEN 1 ELSE 0 END),"

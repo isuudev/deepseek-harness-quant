@@ -29,8 +29,9 @@ BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
 import numpy as np
+from data.cache import CACHE_DIR
 
-PAPER_DB = BASE / "data" / "cache" / "paper.db"
+PAPER_DB = CACHE_DIR / "paper.db"
 
 
 def _latest_signal_file():
@@ -74,7 +75,7 @@ def pool_equal_return(codes: list, date: str) -> float:
     if not codes:
         return 0.0
     import sqlite3 as sq
-    con = sq.connect(r"data/cache/bars.db")
+    con = sq.connect(str(CACHE_DIR / "bars.db"))
     ph = ",".join("?" * len(codes))
     rows = con.execute(
         f"SELECT pct_chg FROM daily_bar WHERE date=? AND adjust='qfq' AND code IN ({ph}) "

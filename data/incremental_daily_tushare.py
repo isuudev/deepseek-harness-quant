@@ -43,9 +43,9 @@ BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
 from data.fetcher_tushare import _pro, _call
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 
-BARS_DB = r"data/cache/bars.db"
+BARS_DB = str(CACHE_DIR / "bars.db")
 
 
 def latest_trade_date(pro=None) -> str:

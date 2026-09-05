@@ -2,10 +2,10 @@
 """load_panel 批量读取基准测试（总指导 2026-08-10）"""
 import sys, time
 sys.path.insert(0, '.')
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 import sqlite3
 
-con = sqlite3.connect(r'data/cache\stock_basic.db')
+con = sqlite3.connect(str(CACHE_DIR / 'stock_basic.db'))
 codes = [r[0] for r in con.execute('SELECT code FROM stock_basic LIMIT 1500').fetchall()]
 con.close()
 

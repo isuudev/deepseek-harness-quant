@@ -25,6 +25,7 @@ BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
 from data.cache import CACHE_DIR, DailyCache
+from backtest.core import period_backtest
 
 CACHE = str(CACHE_DIR)   # ★统一用 data/cache.py 的缓存目录解析（env > params.yaml > 默认 data/cache），跨平台
 # 缓存（动态回测重复跑用）
@@ -262,78 +263,6 @@ def _turn_low_score(closes):
     return -r                                      # 取反 → 低换手高分（score 越大越好）
 
 
-def _monthly_backtest(closes, opens, highs, score, topn):
-    """月度调仓 Top N 等权（score 越大越好），★T+1 open 买入 + 一字板涨停过滤，返回日收益序列"""
-    return _period_backtest(closes, opens, highs, score, topn, rebalance="M")
-
-
-def _period_backtest(closes, opens, highs, score, topn, rebalance="M", top_pct=None):
-    """泛化调仓回测：rebalance='M' 月频 / 40 等交易日数 / 'Q' 季度。
-    ★T+1 open 买入 + 一字板涨停过滤（open≈high 买不进），返回日收益序列。
-    ★top_pct：turn_low 低换手 top20% 用（score=-rank → 取 score≥-top_pct 即 rank≤top_pct，非 topn 只）。"""
-    def _pick(sc):
-        if top_pct is None:
-            return sc.nlargest(topn).index.tolist()
-        return sc[sc >= -top_pct].index.tolist()
-    if isinstance(rebalance, int):
-        # 固定交易日调仓：每 rebalance 个交易日选一次（跳过前 60 日热身）
-        positions = list(range(60, len(closes.index), rebalance))
-        if positions and positions[-1] < len(closes.index) - 1:
-            positions.append(len(closes.index) - 1)
-        ret = pd.Series(0.0, index=closes.index)
-        for i, pos in enumerate(positions[:-1]):
-            nxt_pos = positions[i + 1]
-            sc = score.iloc[pos].dropna()
-            if top_pct is None and len(sc) < topn:
-                continue
-            picks = _pick(sc)
-            buy_pos = pos + 1
-            if buy_pos > nxt_pos:
-                continue
-            bo = opens.iloc[buy_pos].reindex(picks)
-            bh = highs.iloc[buy_pos].reindex(picks)
-            buyable = bo[(bo < bh - 1e-9)].index
-            if len(buyable) < 1:
-                continue
-            seg = closes[buyable].iloc[buy_pos: nxt_pos + 1].pct_change().fillna(0)
-            seg.iloc[0] = (closes.iloc[buy_pos][buyable] / opens.iloc[buy_pos][buyable] - 1).values
-            if len(seg):
-                ret.loc[seg.index] = seg.mean(axis=1)
-        return ret
-    ym = closes.index.astype(str).str[:7]
-    if rebalance == "Q":
-        qm = pd.Series(closes.index).dt.to_period("Q").astype(str)
-        period_ends = pd.Series(closes.index).groupby(qm.values).max().tolist()
-    else:
-        period_ends = pd.Series(closes.index).groupby(ym).max().tolist()
-    ret = pd.Series(0.0, index=closes.index)
-    for i, me in enumerate(period_ends):
-        pos = closes.index.get_loc(me)
-        if pos < 60:
-            continue
-        sc = score.iloc[pos].dropna()
-        if top_pct is None and len(sc) < topn:
-            continue
-        picks = _pick(sc)
-        nxt = period_ends[i + 1] if i + 1 < len(period_ends) else closes.index[-1]
-        nxt_pos = closes.index.get_loc(nxt) if nxt in closes.index else len(closes) - 1
-        buy_pos = pos + 1
-        if buy_pos > nxt_pos:
-            continue
-        # T+1 open 买入 + 一字板涨停过滤（open≈high 买不进）
-        bo = opens.iloc[buy_pos].reindex(picks)
-        bh = highs.iloc[buy_pos].reindex(picks)
-        buyable = bo[(bo < bh - 1e-9)].index
-        if len(buyable) < 1:
-            continue
-        seg = closes[buyable].iloc[buy_pos: nxt_pos + 1].pct_change().fillna(0)
-        # 首日收益 = close[buy_pos]/open[buy_pos] - 1（open 买入）
-        seg.iloc[0] = (closes.iloc[buy_pos][buyable] / opens.iloc[buy_pos][buyable] - 1).values
-        if len(seg):
-            ret.loc[seg.index] = seg.mean(axis=1)
-    return ret
-
-
 def run_backtest(strategy="tech3", topn=5, stocks=300, start="2021-01-01", end="2025-12-31"):
     """运行回测 → {metrics, dates, nav, bench_nav, params, elapsed_s}。
     ★每次运行自动存档：历史 JSON（时间戳）+ 当前最新（latest_{key}，同参数覆盖）。
@@ -377,10 +306,8 @@ def run_backtest(strategy="tech3", topn=5, stocks=300, start="2021-01-01", end="
     else:
         score = _tech3_score(closes)
     top_pct = TURN_LOW_TOP_PCT if is_turn_low else None
-    ret = _period_backtest(closes, opens, highs, score, topn, rebalance=meta.get("rebalance", "M"), top_pct=top_pct)
+    ret = period_backtest(closes, opens, highs, score, topn, rebalance=meta.get("rebalance", "M"), top_pct=top_pct)
     ret = ret.loc[ret.index.astype(str) >= start]
-    cost = 0.00026 + 0.0005 + 0.001   # 佣金+印花税+滑点，每月全换仓摊到日
-    ret = ret - cost * 2 * 60 / max(len(ret), 1)
     bench = closes.pct_change().fillna(0).mean(axis=1).loc[ret.index]
     nav = (1 + ret).cumprod()
     bench_nav = (1 + bench).cumprod()

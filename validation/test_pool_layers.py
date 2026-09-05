@@ -21,6 +21,7 @@ sys.path.insert(0, str(BASE))
 
 import pandas as pd
 
+from data.cache import CACHE_DIR
 from strategy.ranking_v2 import rank
 from strategy.pool_layers import build_layers
 
@@ -30,7 +31,7 @@ OUT = BASE / "output" / "pool_layers_test.json"
 def quarter_ends(start="2020-03-01", end="2025-12-31"):
     """季度末交易日列表（用 bars.db 月末真实交易日）"""
     import sqlite3
-    con = sqlite3.connect(r"data/cache/bars.db")
+    con = sqlite3.connect(str(CACHE_DIR / "bars.db"))
     rows = con.execute(
         "SELECT substr(date,1,7) ym, MAX(date) md FROM daily_bar "
         "WHERE code='SH.000300' AND date>=? AND date<=? GROUP BY ym ORDER BY ym",
@@ -47,7 +48,7 @@ def quarter_ends(start="2020-03-01", end="2025-12-31"):
 def next_q_returns(codes, qd, next_qd):
     """从 qd 到 next_qd 的收益（qfq close 比值，%）；缺失返回 NaN"""
     import sqlite3
-    con = sqlite3.connect(r"data/cache/bars.db")
+    con = sqlite3.connect(str(CACHE_DIR / "bars.db"))
     ret = {}
     ph = ",".join("?" * len(codes))
     if not codes:

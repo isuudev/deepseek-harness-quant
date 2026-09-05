@@ -17,6 +17,7 @@ sys.path.insert(0, str(BASE))
 
 import numpy as np
 import pandas as pd
+from data.cache import CACHE_DIR
 
 # 参数（params.yaml stock_state 可覆盖）
 STRENGTH_WINDOW = 60         # 相对强度回看窗口（交易日）
@@ -98,7 +99,7 @@ if __name__ == "__main__":
 
     mv_map = {}
     try:
-        m = pd.read_csv(r"data/cache/circ_mv_map.csv")
+        m = pd.read_csv(str(CACHE_DIR / "circ_mv_map.csv"))
         m["code6"] = m["code"].astype(str).str[:6]
         mv_map = dict(zip(m["code6"], m["mv_yi"]))
     except Exception:

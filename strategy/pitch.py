@@ -36,10 +36,10 @@ sys.path.insert(0, str(BASE))
 import pandas as pd
 import numpy as np
 
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 from strategy.ranking_v2 import load_basic
 
-CACHE = Path(r"data/cache")
+CACHE = CACHE_DIR
 OUT_JSON = BASE / "output" / "pitch_report.json"
 OUT_MD = BASE / "output" / "pitch_report.md"
 

@@ -40,7 +40,9 @@ sys.path.insert(0, str(BASE))
 
 import concurrent.futures
 
-BARS_DB = r"data/cache/bars.db"
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
 LOG_FILE = BASE / "logs" / "backfill_hist.log"
 START = "20100101"
 END = "20181231"

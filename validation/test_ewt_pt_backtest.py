@@ -19,12 +19,12 @@ sys.path.insert(0, str(BASE))
 import numpy as np
 import pandas as pd
 
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 from validation.test_regime_classified import (
     load_index, metrics, regime_cash_at, START, END,
 )
 
-HIST_MV_DB = Path(r"data/cache\hist_mv.db")
+HIST_MV_DB = CACHE_DIR / "hist_mv.db"
 MIN_MV_YI = 50.0
 
 

@@ -17,7 +17,9 @@ for k in ["HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy",
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-DB = Path(r"data/cache/macro.db")
+from data.cache import CACHE_DIR
+
+DB = CACHE_DIR / "macro.db"
 
 
 def main():

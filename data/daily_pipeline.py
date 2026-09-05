@@ -37,7 +37,7 @@ sys.path.insert(0, str(BASE))
 
 PY = sys.executable
 
-from data.cache import minute_download_root
+from data.cache import minute_download_root, CACHE_DIR
 
 # ★2026-08-10 自动发现最新更新目录：用户每日数据更新会生成新目录（如 8.10日更新）
 #   硬编码会漏新数据 → glob 匹配 "*日更新*" 取修改时间最新者
@@ -89,13 +89,13 @@ def run_step(name, cmd, timeout=3600):
 def health_check():
     """数据健康巡检：重复行/最新日期/覆盖率"""
     import sqlite3
-    con = sqlite3.connect("file:data/cache/bars.db?mode=ro&immutable=1", uri=True, timeout=3)
+    con = sqlite3.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1", uri=True, timeout=3)
     dup = con.execute("SELECT COUNT(*) FROM (SELECT code,date,adjust,COUNT(*) c FROM daily_bar GROUP BY code,date,adjust HAVING c>1)").fetchone()[0]
     # ★#143 双库合并探测最新日（08-12 起增量写 bars_incr_*.db，单库会误报旧日）
     latest = con.execute("SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
     try:
         from pathlib import Path as _P
-        for _p in sorted(_P("data/cache").glob("bars_incr_*.db"))[-3:]:
+        for _p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]:
             try:
                 _c = sqlite3.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3)
                 _m = _c.execute("SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]

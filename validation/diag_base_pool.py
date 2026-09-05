@@ -2,7 +2,10 @@
 """诊断底座池每道门槛过滤量"""
 import sqlite3, csv, pandas as pd
 from pathlib import Path
-CACHE = Path(r"data/cache")
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from data.cache import CACHE_DIR
+CACHE = CACHE_DIR
 
 bars = sqlite3.connect(str(CACHE / "bars.db"))
 bcur = bars.cursor()

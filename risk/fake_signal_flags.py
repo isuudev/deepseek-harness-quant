@@ -20,7 +20,9 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-BARS_DB = r"data/cache/bars.db"
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
 
 FLAG_DEFS = {
     "FS-1":  {"name": "坟包假突破", "level": "BLOCK", "rule": "近30日出现 尖顶+连阴+平底 三形态（假突破收割）"},

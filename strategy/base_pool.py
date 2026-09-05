@@ -29,7 +29,9 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-CACHE = Path(r"data/cache")
+from data.cache import CACHE_DIR
+
+CACHE = CACHE_DIR
 OUT = BASE / "output" / "base_pool.json"
 
 MIN_MV_YI = 30.0          # 市值下限 30 亿

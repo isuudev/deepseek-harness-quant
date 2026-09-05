@@ -32,8 +32,9 @@ warnings.filterwarnings("ignore")
 import pandas as pd
 
 from data.finance_calc import parse_num
+from data.cache import CACHE_DIR
 
-FIN_DB = "data/cache/finance.db"
+FIN_DB = str(CACHE_DIR / "finance.db")
 LOG_FILE = BASE / "logs" / "finance_load.log"
 PROGRESS_FILE = BASE / "logs" / "finance_progress.txt"
 FAILED_FILE = BASE / "logs" / "finance_failed_codes.json"
@@ -164,7 +165,7 @@ def parse_finance(code6: str, df: pd.DataFrame) -> list:
 def load_codes(limit=None):
     """从行情缓存取股票代码列表"""
     import sqlite3 as s3
-    con = s3.connect("data/cache/bars.db")
+    con = s3.connect(str(CACHE_DIR / "bars.db"))
     codes = [r[0] for r in con.execute(
         "SELECT DISTINCT code FROM daily_bar WHERE code NOT LIKE 'sh.%' AND code NOT LIKE 'sz.%'")]
     con.close()

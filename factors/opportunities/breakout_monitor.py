@@ -31,7 +31,9 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent.parent   # factors/opportunities/ → deepseek-harness-quant
 sys.path.insert(0, str(BASE))
 
-BARS_DB = r"data/cache/bars.db"
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
 
 
 def check_breakouts(date: str = None) -> list:

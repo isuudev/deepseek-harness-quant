@@ -34,7 +34,9 @@ BASE = Path(__file__).resolve().parent.parent.parent
 if str(BASE) not in sys.path:
     sys.path.insert(0, str(BASE))
 
-BARS_DB = r"data/cache/bars.db"
+from data.cache import CACHE_DIR
+
+BARS_DB = str(CACHE_DIR / "bars.db")
 OUT_DIR = BASE / "output"
 
 
@@ -189,7 +191,7 @@ def macro_score() -> dict:
         # ★#105 真实宏观库修正（macro.db immutable）
         try:
             import sqlite3 as _sq
-            _con = _sq.connect("file:data/cache/macro.db?mode=ro&immutable=1",
+            _con = _sq.connect(f"file:{CACHE_DIR / 'macro.db'}?mode=ro&immutable=1",
                                uri=True, timeout=3)
             # 社融趋势（近3月均 vs 近6月均；1 月季节性冲高用 6 月整体基准平滑）
             _sf = [r[0] for r in _con.execute(

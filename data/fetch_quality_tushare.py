@@ -37,7 +37,9 @@ sys.path.insert(0, str(BASE))
 import pandas as pd
 import concurrent.futures
 
-QD_DB = Path(r"data/cache/finance_quality.db")
+from data.cache import CACHE_DIR
+
+QD_DB = CACHE_DIR / "finance_quality.db"
 LOG_FILE = BASE / "logs" / "quality_tushare.log"
 START_QUARTER = "20240101"
 END_QUARTER = "20260630"
@@ -65,7 +67,7 @@ def _conn():
 
 
 def load_codes():
-    con = sqlite3.connect(r"data/cache/stock_basic.db")
+    con = sqlite3.connect(str(CACHE_DIR / "stock_basic.db"))
     codes = [r[0] for r in con.execute(
         "SELECT code FROM stock_basic WHERE code LIKE '%.SH' OR code LIKE '%.SZ'").fetchall()]
     con.close()
