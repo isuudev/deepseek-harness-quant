@@ -20,8 +20,8 @@ module.exports = {
     const fsSvc = ctx.get('fs')
     const llm = ctx.get('llm')
     const agentDefaultModel = ctx.get('agentDefaultModel')
-    const NODE = process.env.NODE_PATH || 'node'
-    const DSH_BIN = 'npx'
+    const NODE = process.env.NODE || 'node'
+    const DSH_BIN = require('path').join(__dirname, '..', '..', 'node_modules', '@deepseek-ai', 'dsh', 'lib', 'bin.js')
     const DSH_HOME = process.env.DSH_HOME || (require('os').homedir() + '/.dsh')
     const ARCH_FILE = DSH_HOME + '/quantapi_archived.json'
     const NIU_FILE = DSH_HOME + '/quantapi_niu_chat.json'
@@ -168,14 +168,17 @@ module.exports = {
     function roleOf(e) {
       if (!e) return null
       const d = e.data || e
-      if (d.role === 'user' || d.role === 'assistant') return d.role
+      const m = (d && d.message && d.message.role) ? d.message : d
+      if (m.role === 'user' || m.role === 'assistant') return m.role
       if (e.type === 'user/message') return 'user'
       if (e.type === 'assistant/message') return 'assistant'
       return null
     }
     function textOf(e) {
       if (!e) return ''
-      return msgText(e.data || e)
+      const d = e.data || e
+      const m = (d && d.message && d.message.role) ? d.message : d
+      return msgText(m)
     }
     function isInjected(text) {
       const t = String(text || '')
@@ -323,14 +326,64 @@ module.exports = {
               const sid = body.sessionId
               if (!text) return sendJson(res, 400, { ok: false, error: 'need text' })
               if (!sid) return sendJson(res, 400, { ok: false, error: 'need sessionId' })
-              if (!subprocess) return sendJson(res, 503, { ok: false, error: 'subprocess 不可用' })
-              subprocess.spawn({
-                argv: [NODE, DSH_BIN, '-y', '@deepseek-ai/dsh', '--profile', 'headless', '--resume', String(sid), text],
-                cwd: DSH_HOME,
-                stdio: { stdin: 'inherit', stdout: 'pipe', stderr: 'pipe' },
-                graceMs: 600000,
-              })
-              return sendJson(res, 200, { ok: true, accepted: true })
+              try {
+                const resp = await fetch('http://127.0.0.1:3080/api/session.prompt', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    type: 'client-request',
+                    rpcId: 'qp-' + Math.random().toString(36).slice(2, 10),
+                    method: 'session.prompt',
+                    payload: { sessionId: String(sid), mode: 'queue', content: [{ type: 'text', text: text }] },
+                  }),
+                })
+                const data = await resp.json()
+                if (!(data && data.result && data.result.ok)) {
+                  const m = (data && data.result && data.result.error && data.result.error.message) || 'session.prompt failed'
+                  return sendJson(res, 500, { ok: false, error: String(m) })
+                }
+                return sendJson(res, 200, { ok: true, accepted: true })
+              } catch (e) {
+                return sendJson(res, 500, { ok: false, error: String((e && e.message) || e) })
+              }
+            }
+            if (req.method === 'POST' && pathname === '/quantapi/create') {
+              const body = await readBody(req)
+              const cwd = String(body.cwd || '').trim()
+              const title = String(body.title || '').trim()
+              try {
+                const mkRpc = function (method, payload) {
+                  return {
+                    type: 'client-request',
+                    rpcId: 'qc-' + Math.random().toString(36).slice(2, 10),
+                    method: method,
+                    payload: payload,
+                  }
+                }
+                const resp = await fetch('http://127.0.0.1:3080/api/session.create', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(mkRpc('session.create', cwd ? { cwd: cwd } : {})),
+                })
+                const data = await resp.json()
+                const v = data && data.result && data.result.ok ? data.result.value : null
+                if (!v || !v.sessionId) {
+                  const m = (data && data.result && data.result.error && data.result.error.message) || 'session.create failed'
+                  return sendJson(res, 500, { ok: false, error: String(m) })
+                }
+                const sid = String(v.sessionId)
+                if (title) {
+                  await fetch('http://127.0.0.1:3080/api/session.rename', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(mkRpc('session.rename', { sessionId: sid, title: title })),
+                  }).catch(function () {})
+                }
+                cacheSessions = null
+                return sendJson(res, 200, { ok: true, sessionId: sid })
+              } catch (e) {
+                return sendJson(res, 500, { ok: false, error: String((e && e.message) || e) })
+              }
             }
             if (req.method === 'POST' && pathname === '/quantapi/delete') {
               const body = await readBody(req)

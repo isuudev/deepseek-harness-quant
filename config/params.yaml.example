@@ -125,8 +125,9 @@ risk:
   trailing_stop_ma: 50               # 移动止损 50 日均线
   high_drawdown_exit: 0.08           # 阶段高点回撤 8% 卖出
   risk_budget_pct: 0.02              # 单票风险预算 账户 2% [CS-08]
-  max_position_pct: 0.10             # 单票硬上限 10%
+  max_position_pct: 0.10             # 单票硬上限 10%（账户百分比；等权组合单票占比由 max_positions 推导）
   max_industry_pct: 0.30             # 行业上限 30%
+  max_positions: 5                   # ★持股数量纪律（等权：每只 = 1/max_positions；与 max_position_pct 语义解耦）
   vol_target_annual: 0.18            # 组合目标波动 18%（[P0.5校准] 按 A 股实际波动）
 
   # ---- 三层风控（第15课，M4 落地）----

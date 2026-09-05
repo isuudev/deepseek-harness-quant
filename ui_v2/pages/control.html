@@ -140,7 +140,7 @@
     </div>
     <div class="hz-chat-native">
       <div class="hz-sess-panel">
-        <div class="hz-sess-head"><span>会话</span></div>
+        <div class="hz-sess-head"><span>会话</span><button id="hz-new-sess" class="hz-bulk-btn" style="width:auto;padding:3px 10px;flex:none">＋ 新建</button></div>
         <input id="hz-sess-filter" class="hz-sess-filter" placeholder="筛选会话（标题/内容）…">
         <div class="hz-bulk-bar">
           <button id="hz-ck-all" class="hz-bulk-btn" title="全选可删除会话">全选</button>
@@ -657,6 +657,20 @@
     });
   }
   document.getElementById('hz-send').onclick = sendMsg;
+  document.getElementById('hz-new-sess').onclick = function () {
+    var title = prompt('新建会话标题（可留空，默认自动命名）', '');
+    if (title === null) return;
+    hzPost('/api/proxy/quantapi/create', { title: (title || '').trim() }).then(function (res) {
+      if (res && res.ok) {
+        curTarget = { kind: 'root', id: res.sessionId, title: (title || '').trim() || ('会话 ' + String(res.sessionId).slice(0, 8)) };
+        loadSessions();
+      } else {
+        alert('新建会话失败：' + ((res && res.error) || '未知'));
+      }
+    }).catch(function (e) {
+      alert('新建会话失败：' + e.message);
+    });
+  };
   document.getElementById('hz-input').addEventListener('keydown', function (ev) {
     if (ev.key === 'Enter') sendMsg();
   });

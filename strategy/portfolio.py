@@ -30,6 +30,8 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
+from data.config import load_params
+
 PORTFOLIO_JSON = BASE / "logs" / "portfolio.json"
 DECISIONS_JSON = BASE / "logs" / "deck_decisions.json"
 # ★2026-08-10 审计修复：主程序 08-09 起风控输出为 stock_risk_map_v2.json（5202 只全市场），v1(1767 只)已过时
@@ -50,7 +52,7 @@ def _latest_glob(pat: str, fallback: Path) -> Path:
 STOP_MATRIX_JSON = Path(
     r"data/factorpool/output/combo_reports/stop_matrix_v2.json")
 
-MAX_POSITIONS = 5          # 用户纪律：持股 ≤ 5 只
+MAX_POSITIONS = int(load_params().get("risk", {}).get("max_positions", 5) or 5)   # 持股数量纪律（配置化，等权）
 
 
 def _entry_price_of(code: str, date: str):
@@ -199,17 +201,18 @@ def _industry_of(code: str):
 
 def _risk_gate(code: str, holdings: list, sector_map: dict):
     """★风控门禁：买入决策必经 RiskAgent.check_order（一票否决）。
-    返回 (ok, reason)；REJECT → ok=False。
-    说明：等权 size=1/MAX_POSITIONS；用等权口径配置（单票上限=等权占比）避免等权 20% 误触发单笔 REDUCE，
-    核心生效项 = 行业集中度（同行业 >30% 拒绝）+ 总仓位；回撤熔断传 0（portfolio 无净值历史，接入 paper_account 时补）。"""
+    返回 (ok, reason)；仅 APPROVE 放行（等权无法缩小仓位 → REDUCE 也拒绝）。
+    语义统一：等权 size=1/max_positions；单票/标的上限按等权占比推导，
+    行业上限走 params risk.max_industry_pct，总仓位由 max_positions 数量纪律控制（=1.0）。"""
     from risk.risk_agent import RiskAgent, Decision
+    risk_cfg = load_params().get("risk", {}) or {}
     size = 1.0 / MAX_POSITIONS
     current_portfolio = {c: size for c in holdings}
     sector = sector_map.get(code, "")
     ra = RiskAgent({
         "max_position_pct": size,
         "max_symbol_exposure": size * 2,
-        "max_industry_pct": 0.30,
+        "max_industry_pct": risk_cfg.get("max_industry_pct", 0.30),
         "max_total_exposure": 1.0,
     })
     r = ra.check_order(code, size, current_portfolio, 0.0, sector=sector, sector_map=sector_map)
