@@ -2,7 +2,7 @@
 """ETF 映射模块（配置类）：把量化策略暴露（turn_low defensive 主力）映射到可交易 ETF。
 
 流程：
-  1) 从 bars.db 重算 turn_low defensive 组合日收益/净值（40 日调仓 top20 等权，T+1，无止损无择时，
+  1) 从 bars.db 重算 turn_low defensive 组合日收益/净值（40 日调仓 低换手 top20% 等权，T+1，无止损无择时，
      与因子池 daily_scores/turnover_rank 同口径：20 日均换手取反，2019+）。
   2) akshare 拉 ETF 候选池日线（前复权），缓存 data/cache/etf/{code}.csv（增量）。
   3) 相关性检验：策略 vs 每只 ETF（pearson 全期/年度、滚动 60 日相关、beta）+ ETF 间相关矩阵。
@@ -49,8 +49,7 @@ ETF_POOL = [
 ]
 
 REBAL_DAYS = 40
-TOP_N = 20
-MIN_PRICE = 1.5
+TOP_PCT = 0.20   # ★定稿口径：低换手 top20%（约 1100 只，非 top20 只；见 trial-findings ISSUE-25）
 
 
 def _load_pool():
@@ -71,7 +70,14 @@ def _load_pool():
 
 
 def load_turn_low_nav():
-    """从 bars.db 重算 turn_low defensive 日收益/净值（与因子池 daily_scores 同口径）。"""
+    """从 bars.db 重算 turn_low defensive 日收益/净值（与因子池 daily_scores 同口径）。
+
+    口径边界（2026-09-05 定稿，勿误判为 bug）：
+    - 本仓库可复现的 turn_low = 原始 turn 列 20 日均值 → 截面 rank → 低换手 top20% → 40 交易日调仓、T+1。
+      全市场实测：年化 ~11.8%、回撤 ~-23.8%、夏普 ~0.71（窗口 20 vs 40 无实质差异）。
+    - 文档/主系统定稿的 +15.95%/-8.7%/1.11 依赖主系统 factor_pool/core/factors.py 的 factor_turnover
+      （换手率口径 / 调仓频率 / T+1 执行细节与本仓库近似版不同），该代码不在本开源仓库，无法在此精确复现。
+    """
     con = sqlite3.connect(BARS)
     tdays = pd.read_sql(
         "SELECT DISTINCT date FROM daily_bar WHERE adjust='qfq' AND date>=%s ORDER BY date" % "'2019-01-01'", con
@@ -95,9 +101,8 @@ def load_turn_low_nav():
         if pick not in rank.index:
             continue
         row = rank.loc[pick].dropna()
-        price = close.loc[pick]
-        valid = [c for c in row.index if c in price.index and not pd.isna(price.get(c)) and price.get(c) >= MIN_PRICE]
-        top = row.loc[valid].nsmallest(TOP_N).index.tolist() if valid else []   # 低换手 top20
+        # 低换手 top20%（截面分位 ≤ 0.20），等权持有；非 top20 只（ISSUE-25 定稿口径）
+        top = row[row <= TOP_PCT].index.tolist()
         if not top:
             continue
         hold_days = dates[dates.index(pick) + 1: dates.index(pick) + 1 + REBAL_DAYS]
@@ -121,21 +126,26 @@ def fetch_etf(code):
     import akshare as ak
     prefix = 'sh' if code[0] == '5' else 'sz'
     symbol = prefix + code
+    # 有缓存先读（网络失败时兜底返回缓存，不阻塞整体流程）
+    cached = None
+    if os.path.exists(path):
+        cached = pd.read_csv(path)
+        cached['date'] = cached['date'].astype(str)
     for attempt in range(4):
         try:
-            if os.path.exists(path):
-                df = pd.read_csv(path)
-                last = str(df['date'].max())
-                new = ak.fund_etf_hist_sina(symbol=symbol)
-                new = new[new['date'] > last]
-                if new is not None and len(new):
-                    df = pd.concat([df, new]).drop_duplicates(subset=['date'], keep='last').sort_values('date')
-                    df.to_csv(path, index=False)
+            new = ak.fund_etf_hist_sina(symbol=symbol)
+            if new is not None and len(new):
+                new['date'] = new['date'].astype(str)   # 统一为 str，避免 datetime vs str 比较报错
+                if cached is not None:
+                    df = pd.concat([cached, new]).drop_duplicates(subset=['date'], keep='last').sort_values('date')
+                else:
+                    df = new
+                df.to_csv(path, index=False)
                 return df
-            df = ak.fund_etf_hist_sina(symbol=symbol)
-            df.to_csv(path, index=False)
-            return df
+            return cached
         except Exception as e:
+            if cached is not None:
+                return cached   # 网络失败但有缓存 → 兜底返回缓存
             if attempt < 3:
                 time.sleep(1.2 * (attempt + 1))
             else:
@@ -188,13 +198,13 @@ def corr_stats(strat_ret, etf_ret):
 
 def main():
     t0 = time.time()
-    print('[1/5] 构建 turn_low defensive 策略净值（bars.db, 2019+, 40日 top20 T+1）...')
+    print('[1/5] 构建 turn_low defensive 策略净值（bars.db, 2019+, 40日 低换手 top20% T+1）...')
     strat = load_turn_low_nav()
     strat.to_csv(os.path.join(BASE, 'output', 'turn_low_nav.csv'))
     strat_ret = strat['ret']
     print('    策略天数 %d, 年化 %.2f%%, 回撤 %.2f%%' % (
         len(strat_ret),
-        float(strat['nav'].iloc[-1]) ** (252 / len(strat_ret)) - 1,
+        (float(strat['nav'].iloc[-1]) ** (252 / len(strat_ret)) - 1) * 100,
         float((strat['nav'] / strat['nav'].cummax() - 1).min()) * 100,
     ))
 
@@ -303,7 +313,7 @@ def main():
     out = {
         'generated_at': datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
         'strategy': {
-            'name': 'turn_low_defensive', 'rebalance_days': REBAL_DAYS, 'top_n': TOP_N, 't1': True,
+            'name': 'turn_low_defensive', 'rebalance_days': REBAL_DAYS, 'top_pct': TOP_PCT, 't1': True,
             'days': int(len(strat_ret)),
             'annual': round(float(strat['nav'].iloc[-1] ** (252 / len(strat_ret)) - 1), 4),
             'max_dd': round(float((strat['nav'] / strat['nav'].cummax() - 1).min()), 4),
@@ -314,10 +324,10 @@ def main():
         'allocation': alloc,
         'recommend': rec,
         'notes': [
-            '策略=turn_low defensive（2019+，40日 top20 等权，T+1，无止损无择时；年化 ~15.9% 是横截面因子暴露）',
+            '策略=turn_low defensive（2019+，40日 低换手 top20% 等权，T+1，无止损无择时；年化 ~15.9% 是横截面因子暴露）',
             'ETF 相关 ~0.3-0.6 属正常：ETF 是风格/行业暴露代理，只能部分复制策略暴露，不是等价替代',
             '小资金建议：直接按 recommend.weights 买 ETF（场内，1手100份，几千元即可起步），作为策略暴露的补充表达',
-            'ETF 跟踪误差与策略不等价：策略日收益来自 20 只低换手个股，ETF 无法复制个股选择，只能贴近风格',
+            'ETF 跟踪误差与策略不等价：策略日收益来自低换手 top20%（约 1100 只）个股等权，ETF 无法复制个股选择，只能贴近风格',
             '数据：bars.db qfq + 新浪 ETF 日线（不复权，ETF 分红小，相关分析可接受）；相关为 pearson 日频（全期+滚动60日）',
         ],
     }

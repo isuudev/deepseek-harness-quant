@@ -7,7 +7,7 @@
 策略注册表（STRATEGIES，前端 /api/live/backtest_strategies 动态读取）：
   tech3      技术三因子（rps_120 反转 + lowvol_60 反转 + near_high_250 正向）· 月频
   script1    大市值三因子（营收增长率 + 市值 + Beta，高增长大市值高Beta）· 月频
-  turn_low   低换手防御（20 日均换手截面最低 TopN，40 交易日调仓）· 防守主方案
+  turn_low   低换手防御（20 日均换手截面最低 top20%，40 交易日调仓）· 防守主方案
   factor_all 因子全量回测（外包因子池技术面因子逐个 top10% → 归档）· 批处理
 
 性能：价格面板 + 财务/市值数据按 key 缓存，重复跑不重载（首次 ~5-15s → 后续 ~1-2s）。
@@ -32,6 +32,11 @@ _PANEL = {"key": None, "closes": None}
 _FIN = None
 _MV = None
 
+TURN_LOW_TOP_PCT = 0.20   # ★turn_low 定稿口径：低换手 top20%（非 top20 只，见 trial-findings ISSUE-25）
+# ★口径边界（2026-09-05）：本仓库 turn_low = 原始 turn 列 20 日均值 → rank → 低换手 top20% + 全市场池，
+#   实测年化 ~10.7%（2021-2025）；文档/主系统 +15.95%/-8.7%/1.11 依赖主系统 factor_pool/core/factors.py
+#   的 factor_turnover（口径/调仓/T+1 细节不同），该代码不在本仓库，无法在此精确复现。
+
 # ★2026-08-16 策略注册表（前端菜单 = 本表动态生成；新增策略在此登记 + 在 run_backtest 分发）
 STRATEGIES = {
     "tech3": {
@@ -50,7 +55,7 @@ STRATEGIES = {
     },
     "turn_low": {
         "name": "低换手防御", "category": "策略", "instant": True,
-        "desc": "20 日均换手截面最低 TopN 等权，40 交易日调仓，T+1 执行，无止损无择时（防守主方案）",
+        "desc": "20 日均换手截面最低 top20% 等权（约 1100 只），40 交易日调仓，T+1 执行，无止损无择时（防守主方案）",
         "factors": ["turn_20d"],
         "defaults": {"topn": 20, "stocks": 300},
         "rebalance": 40,
@@ -120,7 +125,12 @@ def _q(sql, db, params=()):
         con.close()
 
 
-def _load_pool(stocks):
+def _load_pool(stocks, full_market=False):
+    if full_market:
+        # ★turn_low 防守策略：全市场池（低换手 top20% 需全截面 ~5500 只，非 top300 大市值）
+        return [r[0] for r in _q(
+            "SELECT code FROM daily_bar WHERE date>='2020-06-01' AND date<='2025-12-31' "
+            "GROUP BY code HAVING COUNT(*)>=1000", f"{CACHE}/bars.db")]
     rows = _q("SELECT code, circ_mv FROM hist_mv WHERE month='2020-12'", f"{CACHE}/hist_mv.db")
     top = sorted(rows, key=lambda r: -(r[1] or 0))[:stocks * 3]
     codes = [r[0] for r in top]
@@ -154,10 +164,10 @@ def _load_prices(codes, start, end):
     }
 
 
-def _get_panel(stocks, start, end):
-    key = (stocks, start, end)
+def _get_panel(stocks, start, end, full_market=False):
+    key = (stocks, start, end, full_market)
     if _PANEL["key"] != key:
-        codes = _load_pool(stocks)
+        codes = _load_pool(stocks, full_market=full_market)
         _PANEL["key"] = key
         _PANEL["data"] = _load_prices(codes, start, end)
     return _PANEL["data"]
@@ -257,9 +267,14 @@ def _monthly_backtest(closes, opens, highs, score, topn):
     return _period_backtest(closes, opens, highs, score, topn, rebalance="M")
 
 
-def _period_backtest(closes, opens, highs, score, topn, rebalance="M"):
+def _period_backtest(closes, opens, highs, score, topn, rebalance="M", top_pct=None):
     """泛化调仓回测：rebalance='M' 月频 / 40 等交易日数 / 'Q' 季度。
-    ★T+1 open 买入 + 一字板涨停过滤（open≈high 买不进），返回日收益序列。"""
+    ★T+1 open 买入 + 一字板涨停过滤（open≈high 买不进），返回日收益序列。
+    ★top_pct：turn_low 低换手 top20% 用（score=-rank → 取 score≥-top_pct 即 rank≤top_pct，非 topn 只）。"""
+    def _pick(sc):
+        if top_pct is None:
+            return sc.nlargest(topn).index.tolist()
+        return sc[sc >= -top_pct].index.tolist()
     if isinstance(rebalance, int):
         # 固定交易日调仓：每 rebalance 个交易日选一次（跳过前 60 日热身）
         positions = list(range(60, len(closes.index), rebalance))
@@ -269,9 +284,9 @@ def _period_backtest(closes, opens, highs, score, topn, rebalance="M"):
         for i, pos in enumerate(positions[:-1]):
             nxt_pos = positions[i + 1]
             sc = score.iloc[pos].dropna()
-            if len(sc) < topn:
+            if top_pct is None and len(sc) < topn:
                 continue
-            picks = sc.nlargest(topn).index.tolist()
+            picks = _pick(sc)
             buy_pos = pos + 1
             if buy_pos > nxt_pos:
                 continue
@@ -297,9 +312,9 @@ def _period_backtest(closes, opens, highs, score, topn, rebalance="M"):
         if pos < 60:
             continue
         sc = score.iloc[pos].dropna()
-        if len(sc) < topn:
+        if top_pct is None and len(sc) < topn:
             continue
-        picks = sc.nlargest(topn).index.tolist()
+        picks = _pick(sc)
         nxt = period_ends[i + 1] if i + 1 < len(period_ends) else closes.index[-1]
         nxt_pos = closes.index.get_loc(nxt) if nxt in closes.index else len(closes) - 1
         buy_pos = pos + 1
@@ -345,22 +360,24 @@ def run_backtest(strategy="tech3", topn=5, stocks=300, start="2021-01-01", end="
             return {"ok": False, "error": "因子全量回测超时（>10 分钟）", "params": {"strategy": strategy}}
 
     t0 = time.time()
-    panel = _get_panel(stocks, start, end)
+    # ★turn_low 用全市场池（低换手 top20% 需全截面），其余策略用 topN 大市值池
+    is_turn_low = (strategy == "turn_low" or meta.get("scorer") == "turn_low"
+                   or (meta.get("external") and meta.get("factors") == ["turn_20d"]))
+    panel = _get_panel(stocks, start, end, full_market=is_turn_low)
     closes, opens, highs = panel["close"], panel["open"], panel["high"]
     # ★动态化：外部策略评分分发（factor_list 声明式组合 / scorer 内置函数 / 内置策略）
     if meta.get("factor_list"):
         score = _compose_score(closes, meta["factor_list"])
     elif meta.get("scorer") == "script1":
         score = _script1_score(closes)
-    elif meta.get("scorer") == "turn_low" or (meta.get("external") and meta.get("factors") == ["turn_20d"]):
+    elif is_turn_low:
         score = _turn_low_score(closes)
     elif strategy == "script1":
         score = _script1_score(closes)
-    elif strategy == "turn_low":
-        score = _turn_low_score(closes)
     else:
         score = _tech3_score(closes)
-    ret = _period_backtest(closes, opens, highs, score, topn, rebalance=meta.get("rebalance", "M"))
+    top_pct = TURN_LOW_TOP_PCT if is_turn_low else None
+    ret = _period_backtest(closes, opens, highs, score, topn, rebalance=meta.get("rebalance", "M"), top_pct=top_pct)
     ret = ret.loc[ret.index.astype(str) >= start]
     cost = 0.00026 + 0.0005 + 0.001   # 佣金+印花税+滑点，每月全换仓摊到日
     ret = ret - cost * 2 * 60 / max(len(ret), 1)
