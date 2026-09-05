@@ -24,9 +24,9 @@ import pandas as pd
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
-from data.cache import DailyCache
+from data.cache import CACHE_DIR, DailyCache
 
-CACHE = r"data\cache"
+CACHE = str(CACHE_DIR)   # ★统一用 data/cache.py 的缓存目录解析（env > params.yaml > 默认 data/cache），跨平台
 # 缓存（动态回测重复跑用）
 _PANEL = {"key": None, "closes": None}
 _FIN = None

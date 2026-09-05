@@ -33,10 +33,10 @@ import pandas as pd
 
 from factors.opportunities.scan import triggers
 
-BARS_DB = r"data\cache\bars.db"
-FIN_DB = r"data\cache\finance.db"
-QD_DB = r"data\cache\finance_quality.db"
-BASIC_DB = r"data\cache\stock_basic.db"
+BARS_DB = r"data/cache/bars.db"
+FIN_DB = r"data/cache/finance.db"
+QD_DB = r"data/cache/finance_quality.db"
+BASIC_DB = r"data/cache/stock_basic.db"
 OUT = BASE / "logs" / "opportunity_winrates.json"
 
 HORIZONS = {1: 1, 3: 3, 6: 6}          # 持有月数

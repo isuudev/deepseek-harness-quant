@@ -60,7 +60,7 @@ def _bars_version() -> float:
     """数据源版本 = bars.db + 增量库的最新 mtime（★0.01s；MAX(date) 全表扫 900 万行要 1s+）"""
     try:
         import glob as _g
-        fs = [r"data\cache\bars.db"] + _g.glob(r"data\cache\bars_incr_*.db")
+        fs = [r"data/cache/bars.db"] + _g.glob(r"data/cache/bars_incr_*.db")
         mt = [os.path.getmtime(f) for f in fs if os.path.exists(f)]
         return max(mt) if mt else 0.0
     except Exception:

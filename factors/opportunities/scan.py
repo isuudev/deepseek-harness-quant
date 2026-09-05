@@ -46,10 +46,10 @@ from factors.opportunities.score import (opportunity_score, gains_score, prob_sc
                                          EXPRESS_MIN_FAMILY, CONSENSUS_MIN_FAMILY,
                                          EXPRESS_PER_LINE, CONSENSUS_PER_LINE)
 
-BARS_DB = r"data\cache\bars.db"
-FIN_DB = r"data\cache\finance.db"
-QD_DB = r"data\cache\finance_quality.db"
-BASIC_DB = r"data\cache\stock_basic.db"
+BARS_DB = str(BASE / "data" / "cache" / "bars.db")
+FIN_DB = str(BASE / "data" / "cache" / "finance.db")
+QD_DB = str(BASE / "data" / "cache" / "finance_quality.db")
+BASIC_DB = str(BASE / "data" / "cache" / "stock_basic.db")
 OUT = BASE / "logs" / f"opp_pool_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"   # 每次运行唯一文件名（安全层限制同名文件只能写一次）
 # 兼容读取：pitch_v2.py 用 get_latest_pool() 取最新
 
@@ -198,6 +198,8 @@ def load_fundamentals(end: str = None) -> pd.DataFrame:
     if q is not None and not q.empty:
         df = df.merge(q[["code6", "gp_margin"]], on="code6", how="left")
         df["gross_margin"] = df["gp_margin"]
+    else:
+        df["gross_margin"] = None  # 质量库缺失时补空列，避免下游 KeyError
     df["code6"] = df["code6"].astype(str)
     return df.set_index("code6")
 

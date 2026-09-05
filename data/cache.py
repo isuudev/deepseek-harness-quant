@@ -192,7 +192,7 @@ class DailyCache:
                 "(code,date,open,high,low,close,preclose,volume,amount,turn,pct_chg,is_st,adjust,source) "
                 "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", rows)
             # 更新 meta —— ★累计覆盖语义（F-4 修复 2026-08-07）：
-            dmin, dmax = df["date"].min(), df["date"].max()
+            dmin, dmax = str(df["date"].min()), str(df["date"].max())
             old = con.execute(
                 "SELECT start_date, end_date FROM bar_meta WHERE code=? AND adjust=?",
                 (code, adjust)).fetchone()

@@ -24,7 +24,7 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
-BARS_DB = r"data\cache\bars.db"
+BARS_DB = r"data/cache/bars.db"
 
 # (名称, glob 模式, 目录, 期望最大时效(小时), 说明)
 CHAINS = [
@@ -104,7 +104,7 @@ def check_db() -> dict:
         con = sqlite3.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)
         out["bars_latest"] = con.execute(
             "SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
-        out["n_inc_db"] = len(glob.glob(r"data\cache\bars_incr_*.db"))
+        out["n_inc_db"] = len(glob.glob(r"data/cache/bars_incr_*.db"))
         con.close()
     except Exception as e:
         out["error"] = str(e)[:80]

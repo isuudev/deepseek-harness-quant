@@ -195,8 +195,12 @@ def save_latest(key: str, returns: pd.Series, params: dict = None, metrics: dict
     json_path = out_dir / f"latest_{key}.json"
     json_path.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
     html_path = out_dir / f"latest_{key}.html"
-    html_path.write_text(render_html(r, benchmark=benchmark, metrics=metrics,
-                                     params=params, title=title), encoding="utf-8")
+    try:
+        html_path.write_text(render_html(r, benchmark=benchmark, metrics=metrics,
+                                         params=params, title=title), encoding="utf-8")
+    except Exception:
+        # plotly 等可选依赖缺失时不阻塞回测（JSON 已存，前端走 API 渲染，HTML 仅归档用）
+        html_path = Path("")
     return {"json_path": str(json_path), "html_path": str(html_path), "metrics": metrics}
 
 
