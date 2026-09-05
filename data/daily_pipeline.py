@@ -91,24 +91,10 @@ def health_check():
     import sqlite3
     con = sqlite3.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1", uri=True, timeout=3)
     dup = con.execute("SELECT COUNT(*) FROM (SELECT code,date,adjust,COUNT(*) c FROM daily_bar GROUP BY code,date,adjust HAVING c>1)").fetchone()[0]
-    # ★#143 双库合并探测最新日（08-12 起增量写 bars_incr_*.db，单库会误报旧日）
     latest = con.execute("SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
-    try:
-        from pathlib import Path as _P
-        for _p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]:
-            try:
-                _c = sqlite3.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3)
-                _m = _c.execute("SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
-                _c.close()
-                if _m and _m > latest:
-                    latest = _m
-            except Exception:
-                pass
-    except Exception:
-        pass
     bs = con.execute("SELECT COUNT(DISTINCT code) FROM daily_bar WHERE date=? AND adjust='qfq' AND (code LIKE 'sh.%' OR code LIKE 'sz.%')", (latest,)).fetchone()[0]
     con.close()
-    log(f"  [巡检] bars.db 重复={dup} | 最新={latest}（双库合并） | 残留baostock格式={bs}")
+    log(f"  [巡检] bars.db 重复={dup} | 最新={latest} | 残留baostock格式={bs}")
     if bs > 0:
         log(f"  ⚠️ 发现 {bs} 行 baostock 格式残留（需清理）")
     if dup > 0:

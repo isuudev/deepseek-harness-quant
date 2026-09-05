@@ -59,10 +59,9 @@ def _read(pattern: str, subdir: str = "logs") -> dict:
 
 
 def _bars_version() -> float:
-    """数据源版本 = bars.db + 增量库的最新 mtime（★0.01s；MAX(date) 全表扫 900 万行要 1s+）"""
+    """数据源版本 = bars.db 的 mtime。"""
     try:
-        import glob as _g
-        fs = [str(CACHE_DIR / "bars.db")] + _g.glob(str(CACHE_DIR / "bars_incr_*.db"))
+        fs = [str(CACHE_DIR / "bars.db")]
         mt = [os.path.getmtime(f) for f in fs if os.path.exists(f)]
         return max(mt) if mt else 0.0
     except Exception:
@@ -102,8 +101,7 @@ def live_forward(force: bool = False) -> dict:
         try:
             import sqlite3 as _sq2
             from pathlib import Path as _P3
-            for _p in ([str(CACHE_DIR / "bars.db")] +
-                       [str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]):
+            for _p in [str(CACHE_DIR / "bars.db")]:
                 try:
                     con = _sq2.connect(_P3(_p).as_uri() + "?mode=ro&immutable=1",
                                        uri=True, timeout=3)
@@ -1075,12 +1073,8 @@ def portfolio_perf() -> dict:
         if not positions:
             return {"ok": True, "ts": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                     "n_pos": 0, "series": [], "stats": {}, "note": "无持仓"}
-        # ★#69 双库合并（主库 + 最近 3 个增量库 immutable）
         def _dbs():
-            import glob as _g
-            dbs = [str(CACHE_DIR / "bars.db")]
-            inc = sorted(_g.glob(str(CACHE_DIR / "bars_incr_*.db")))[-3:]
-            return dbs + inc
+            return [str(CACHE_DIR / "bars.db")]
         def _ro(p):
             return f"{_P(p).as_uri()}?mode=ro&immutable=1"
         def _fetch(code, ed, adjust="qfq"):
@@ -1391,13 +1385,10 @@ def live_calendar() -> dict:
         return _cal_cache["data"]
     import sqlite3
     from pathlib import Path as _P
-    # 交易日历（★#102 双库合并——主库写保护后新交易日只在增量库，单读主库会漏最新日）
     try:
-        import glob as _g2
         from pathlib import Path as _P2
         _dayset = set()
-        _db_paths = [str(CACHE_DIR / "bars.db")] + [
-            str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]
+        _db_paths = [str(CACHE_DIR / "bars.db")]
         for _p in _db_paths:
             try:
                 con = sqlite3.connect(_P2(_p).as_uri() + "?mode=ro&immutable=1",

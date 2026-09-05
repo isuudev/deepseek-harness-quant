@@ -71,51 +71,35 @@ def _entry_price_of(code: str, date: str):
 
 
 def _latest_close_of(code: str):
-    """★2026-08-11 百轮#38：该股最新收盘价（组合盈亏现价基准）
-    ★2026-08-12 百轮#102：双库合并——主库写保护后最新日数据在 bars_incr 增量库，
-    单读主库会让盈亏停在旧日（#65 教训）"""
+    """该股最新收盘价（组合盈亏现价基准）。单库读取 bars.db。"""
     try:
         import sqlite3
-        import glob as _glob
         from pathlib import Path as _P
         from data.cache import CACHE_DIR
-        paths = [str(CACHE_DIR / "bars.db")]
-        paths += [str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]
-        best = None
-        for _p in paths:
-            try:
-                _uri = _P(_p).as_uri() + "?mode=ro&immutable=1"
-                con = sqlite3.connect(_uri, uri=True, timeout=3)
-                row = con.execute(
-                    "SELECT close, date FROM daily_bar WHERE code=? ORDER BY date DESC LIMIT 1",
-                    (code,)).fetchone()
-                con.close()
-                if row and row[0] and (best is None or row[1] > best[1]):
-                    best = (float(row[0]), row[1])
-            except Exception:
-                continue
-        return best[0] if best else None
+        _p = str(CACHE_DIR / "bars.db")
+        _uri = _P(_p).as_uri() + "?mode=ro&immutable=1"
+        con = sqlite3.connect(_uri, uri=True, timeout=3)
+        try:
+            row = con.execute(
+                "SELECT close, date FROM daily_bar WHERE code=? ORDER BY date DESC LIMIT 1",
+                (code,)).fetchone()
+        finally:
+            con.close()
+        return float(row[0]) if row and row[0] else None
     except Exception:
         return None
 
 
 def _load_latest_trade_date() -> str | None:
-    """★2026-08-12 十轮#172：最新交易日（主库+增量库合并探测，immutable 防锁）"""
+    """最新交易日（单库读取 bars.db）。"""
     try:
         import sqlite3 as _sq
         from data.cache import CACHE_DIR
-        dates = []
-        for _db in [CACHE_DIR / "bars.db"] + sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]:
-            if not _db.exists():
-                continue
-            try:
-                with _sq.connect(f"file:{_db.as_posix()}?mode=ro&immutable=1", uri=True, timeout=3) as _c:
-                    _d = _c.execute("SELECT MAX(date) FROM daily_bar").fetchone()[0]
-                    if _d:
-                        dates.append(_d)
-            except Exception:
-                continue
-        return max(dates) if dates else None
+        _db = CACHE_DIR / "bars.db"
+        if not _db.exists():
+            return None
+        with _sq.connect(f"file:{_db.as_posix()}?mode=ro&immutable=1", uri=True, timeout=3) as _c:
+            return _c.execute("SELECT MAX(date) FROM daily_bar").fetchone()[0]
     except Exception:
         return None
 

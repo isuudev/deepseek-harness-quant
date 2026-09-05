@@ -56,37 +56,9 @@ def load_recent(days: int = CONSEC_DAYS) -> pd.DataFrame:
     con = sqlite3.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)
     try:
         dates = [r[0] for r in con.execute("SELECT DISTINCT date FROM daily_bar ORDER BY date DESC LIMIT ?", (days + 3,))]
-        # ★#143 增量库日期并入（08-12 起增量写 bars_incr_*.db，主库写保护停更）
-        try:
-            from pathlib import Path as _P
-            for _p in sorted(_P(BARS_DB).parent.glob("bars_incr_*.db"))[-3:]:
-                try:
-                    _c = sqlite3.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3)
-                    dates += [r[0] for r in _c.execute(
-                        "SELECT DISTINCT date FROM daily_bar ORDER BY date DESC LIMIT ?", (days + 3,))]
-                    _c.close()
-                except Exception:
-                    pass
-        except Exception:
-            pass
         dates = sorted(set(dates))[-days:]
         q = "SELECT code,date,open,high,low,close,pct_chg,volume,turn,is_st FROM daily_bar WHERE date IN (%s)" % ",".join("?" * len(dates))
         df = pd.read_sql_query(q, con, params=dates)
-        # ★#143 增量库同日数据补充（增量行覆盖主库同 key——keep=last 增量优先）
-        try:
-            from pathlib import Path as _P
-            for _p in sorted(_P(BARS_DB).parent.glob("bars_incr_*.db"))[-3:]:
-                try:
-                    _c = sqlite3.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3)
-                    _df2 = pd.read_sql_query(q, _c, params=dates)
-                    if len(_df2):
-                        df = pd.concat([df, _df2], ignore_index=True).drop_duplicates(
-                            subset=["code", "date"], keep="last")
-                    _c.close()
-                except Exception:
-                    pass
-        except Exception:
-            pass
         # ★2026-08-12 #136 ST 名单补充：主库最新日 is_st 可能丢列（Tushare 增量写 0）→
         #   用 scan.load_st_codes（含异常回溯）名单覆盖最新日 ST 标记，保证涨停板幅度判断正确
         try:

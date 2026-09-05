@@ -199,17 +199,8 @@ def check() -> int:
     #    正常 ~200 只/日；<50 = is_st 列异常（Tushare 增量丢列）→ 报警（load_st_codes 已自动回溯）
     try:
         import sqlite3 as _s17
-        from pathlib import Path as _P17
         _B17 = str(CACHE_DIR / "bars.db")
         _conns17 = [_s17.connect(f"file:{_B17}?mode=ro&immutable=1", uri=True, timeout=3)]
-        try:
-            for _p17 in sorted(_P17(_B17).parent.glob("bars_incr_*.db"))[-3:]:
-                try:
-                    _conns17.append(_s17.connect(f"file:{_p17}?mode=ro&immutable=1", uri=True, timeout=3))
-                except Exception:
-                    pass
-        except Exception:
-            pass
         _mx17, _n17 = None, 0
         for _c17 in _conns17:
             try:

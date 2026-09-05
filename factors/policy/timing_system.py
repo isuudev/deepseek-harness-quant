@@ -53,45 +53,24 @@ def _bars_conn():
     return sqlite3.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)
 
 
-# ★2026-08-12 #135：双库合并探测（#102 教训复发点修复）
-# 主库 bars.db 写保护 → 08-12 后增量进 bars_incr_*.db；单库 MAX(date) 会虚标旧日。
-# timing_system 的 3 处（情绪/宽度兜底 + evaluate date 输出）统一改合并探测。
 _merged_max_cache: dict = {"t": 0.0, "v": ""}
 
 
 def _merged_max_date() -> str:
-    """主库 + 最近 3 增量库合并探测最新交易日（60s 缓存，低频调用足够）"""
+    """主库最新交易日（60s 缓存，低频调用足够）。"""
     import time as _t
     now = _t.time()
     if now - _merged_max_cache["t"] < 60 and _merged_max_cache["v"]:
         return _merged_max_cache["v"]
     mx = None
-    conns = []
     try:
-        conns.append(_bars_conn())
+        _c = _bars_conn()
+        r = _c.execute("SELECT MAX(date) FROM daily_bar").fetchone()[0]
+        if r:
+            mx = r
+        _c.close()
     except Exception:
         pass
-    try:
-        from pathlib import Path as _P
-        for _p in sorted(_P(BARS_DB).parent.glob("bars_incr_*.db"))[-3:]:
-            try:
-                conns.append(sqlite3.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3))
-            except Exception:
-                pass
-    except Exception:
-        pass
-    for _c in conns:
-        try:
-            r = _c.execute("SELECT MAX(date) FROM daily_bar").fetchone()[0]
-            if r and (mx is None or r > mx):
-                mx = r
-        except Exception:
-            pass
-        finally:
-            try:
-                _c.close()
-            except Exception:
-                pass
     if mx:
         _merged_max_cache.update(t=now, v=mx)
     return mx or ""

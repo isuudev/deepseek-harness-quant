@@ -108,7 +108,7 @@ def check_db() -> dict:
         con = sqlite3.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)
         out["bars_latest"] = con.execute(
             "SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
-        out["n_inc_db"] = len(glob.glob(str(CACHE_DIR / "bars_incr_*.db")))
+        out["n_inc_db"] = 0
         con.close()
     except Exception as e:
         out["error"] = str(e)[:80]

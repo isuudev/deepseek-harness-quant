@@ -54,40 +54,9 @@ def load_close_panel(days=300, end=None) -> pd.DataFrame:
     else:
         last = con.execute(
             "SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
-        try:
-            from pathlib import Path as _P
-            for _p in sorted(_P(BARS_DB).parent.glob("bars_incr_*.db"))[-3:]:
-                try:
-                    _c = sqlite3.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3)
-                    _m = _c.execute(
-                        "SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()[0]
-                    _c.close()
-                    if _m and _m > last:
-                        last = _m
-                except Exception:
-                    pass
-        except Exception:
-            pass
     df = pd.read_sql(
         "SELECT date, code, close, volume, high, low FROM daily_bar "
         "WHERE adjust='qfq' AND date<=? AND close>0", con, params=(last,))
-    # ★#143 增量库数据补充（增量行覆盖主库同 key）
-    try:
-        from pathlib import Path as _P
-        for _p in sorted(_P(BARS_DB).parent.glob("bars_incr_*.db"))[-3:]:
-            try:
-                _c = sqlite3.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3)
-                _df2 = pd.read_sql(
-                    "SELECT date, code, close, volume, high, low FROM daily_bar "
-                    "WHERE adjust='qfq' AND date<=? AND close>0", _c, params=(last,))
-                if len(_df2):
-                    df = pd.concat([df, _df2], ignore_index=True).drop_duplicates(
-                        subset=["date", "code"], keep="last")
-                _c.close()
-            except Exception:
-                pass
-    except Exception:
-        pass
     con.close()
     p = df.pivot_table(index="date", columns="code", values="close")
     v = df.pivot_table(index="date", columns="code", values="volume")

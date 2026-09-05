@@ -9,7 +9,7 @@
   python data/incremental_daily_tushare.py --date 20260810   # 指定日期
   python data/incremental_daily_tushare.py --basic    # 附带拉 daily_basic 估值快照（供 stock_check）
 
-写入：DailyCache.put_daily（主库被锁自动路由 bars_incr_*.db，增量覆盖）；幂等（已有日期跳过）。
+写入：DailyCache.put_daily（单库 bars.db，增量覆盖）；幂等（已有日期跳过）。
 """
 import argparse
 
@@ -162,16 +162,6 @@ def fetch_day(pro, trade_date: str):
         try:
             import sqlite3 as _s2
             _cs = [_s2.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)]
-            try:
-                from data.cache import CACHE_DIR as _CD
-                from pathlib import Path as _P2
-                for _p in sorted(_P2(_CD).glob("bars_incr_*.db"))[-3:]:
-                    try:
-                        _cs.append(_s2.connect(f"file:{_p}?mode=ro&immutable=1", uri=True, timeout=3))
-                    except Exception:
-                        pass
-            except Exception:
-                pass
             for _c in _cs:
                 try:
                     for _code, _mxd, _stv in _c.execute(

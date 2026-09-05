@@ -178,9 +178,7 @@ def dedupe() -> dict:
 
 
 def _merged_rows(code: str, date_from: str, conns: list) -> list:
-    """★2026-08-12 百轮#102：跨主库+最近 3 个增量库合并取交易日序列（#65 双库模式）
-    主库写保护 → 08-12 起数据在 bars_incr_*.db——单读主库会永远算不出 T+5（08-14 到期）
-    返回 [(date, close)] 按日期升序去重"""
+    """从连接列表取交易日序列，返回 [(date, close)] 按日期升序去重。"""
     merged = {}
     for _name, _c in conns:
         try:
@@ -202,21 +200,11 @@ def update_fwd() -> dict:
     if not pool["entries"]:
         print("Pitch 远期池: 空池")
         return pool
-    # 主库 + 最近 3 个增量库（immutable）
+    # 单库：只连主库
     conns = []
     try:
         conns.append(("main", sqlite3.connect(f"file:{BARS_DB}?mode=ro&immutable=1",
                                               uri=True, timeout=3)))
-    except Exception:
-        pass
-    try:
-        from data.cache import CACHE_DIR
-        for _p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]:
-            try:
-                conns.append((_p.name, sqlite3.connect(f"file:{_p.as_posix()}?mode=ro&immutable=1",
-                                                       uri=True, timeout=3)))
-            except Exception:
-                continue
     except Exception:
         pass
     changed = 0

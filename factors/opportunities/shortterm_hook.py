@@ -159,10 +159,8 @@ def one_word_disclosure(entries: list) -> int:
     ★2026-08-12 百轮#102：add_date 为近期交易日，主库无该日时查增量库（双库兜底）"""
     try:
         import sqlite3
-        import glob as _glob
         from pathlib import Path as _P
-        _db_paths = [str(CACHE_DIR / "bars.db")] + [
-            str(p) for p in sorted(CACHE_DIR.glob("bars_incr_*.db"))[-3:]]
+        _db_paths = [str(CACHE_DIR / "bars.db")]
         n = 0
         for e in entries:
             code, d = e.get("code"), e.get("add_date") or e.get("entry_date")

@@ -32,9 +32,9 @@ CACHE_SECONDS = 3600  # 1 小时（版本不变才命中）
 
 
 def _bars_version() -> float:
-    """数据源版本 = bars.db + 增量库最新 mtime（0.01s；MAX/DISTINCT 全表扫 900 万行要 6s+）"""
+    """数据源版本 = bars.db 的 mtime。"""
     try:
-        fs = [BARS_DB] + glob.glob(str(Path(BARS_DB).parent / "bars_incr_*.db"))
+        fs = [BARS_DB]
         mt = [os.path.getmtime(f) for f in fs if os.path.exists(f)]
         return max(mt) if mt else 0.0
     except Exception:

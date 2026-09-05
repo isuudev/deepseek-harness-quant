@@ -144,17 +144,10 @@ def load_basic() -> pd.DataFrame:
 
 def load_panel(end: str = None, days: int = 300):
     """日线面板（收盘价 + 成交量）→ (px, vx)；空返回 (None, None)
-    end 只做上限过滤；起点固定 2020-01-01（保证 300 日窗口充足）
-    ★2026-08-10 双库合并：bars.db 被环境写保护 → 增量写入 bars_incr_*.db；
-      此处读取时合并（主库历史 + 增量库最新），保证增量数据对扫描可见
-    """
+    end 只做上限过滤；起点固定 2020-01-01（保证 300 日窗口充足）。"""
     rows = []
-    from data.cache import CACHE_DIR as _CD
     from pathlib import Path as _P
-    # ★2026-08-11 #65 修复：只读最近 3 个增量库 + immutable（原遍历全部 64 个 + 普通连接，
-    #   每库等锁 5-20s → load_panel 10min+ 无输出）。增量语义：最新库已含全部增量，3 个兜底足够。
-    inc_files = sorted(_CD.glob("bars_incr_*.db"))[-3:]
-    dbs = [BARS_DB] + [str(p) for p in inc_files]
+    dbs = [BARS_DB]
     for db in dbs:
         try:
             uri = f"{_P(db).as_uri()}?mode=ro&immutable=1"   # immutable 免等锁（0.01s vs 20s）
@@ -1360,10 +1353,7 @@ def _amount_20d_yi(codes: set) -> dict:
     try:
         import sqlite3 as _sq
         from pathlib import Path as _P
-        import glob as _gl
-        # 主库 + 最近 3 个增量库（immutable 只读，与 portfolio._latest_close_of 同款）
-        _dbs = [str(CACHE_DIR / "bars.db")] + \
-               sorted(_gl.glob(str(CACHE_DIR / "bars_incr_*.db")))[-3:]
+        _dbs = [str(CACHE_DIR / "bars.db")]
         # 收集每 code 的 (date, amount_元) —— 增量库后写覆盖主库同日期
         _by_code = {c: {} for c in codes}
         for _db in _dbs:
