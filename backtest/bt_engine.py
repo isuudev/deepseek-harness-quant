@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 import yaml
 
-from data.cache import DailyCache
+from data.cache import DailyCache, CACHE_DIR
 from factors.factor_engine import compute_factor_panel, FACTOR_FUNCS
 from risk.risk_agent import RiskAgent
 from risk.stop_rules import StopRules

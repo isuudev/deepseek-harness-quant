@@ -527,3 +527,15 @@ def _f(x):
         return v if v == v else None  # NaN → None
     except (TypeError, ValueError):
         return None
+
+
+def minute_download_root() -> Path:
+    """分钟数据下载根目录（用户每日 7z 增量数据位置）。
+
+    优先级：环境变量 LWQUANT_MINUTE_DIR > 默认 <repo>/data/minute/download。
+    用于替代散落在各脚本里的 data/minute/download 相对路径/反斜杠硬编码。
+    """
+    env = os.environ.get("LWQUANT_MINUTE_DIR")
+    if env:
+        return Path(env)
+    return Path(__file__).resolve().parent.parent / "data" / "minute" / "download"

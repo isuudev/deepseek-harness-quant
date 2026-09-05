@@ -7,13 +7,15 @@
 import socket
 
 # ★2026-08-13 黑框隐藏（总指挥要求：计划任务/常驻进程不弹黑框，运行完自动关闭不留窗）
-try:
-    import ctypes
-    _h = ctypes.windll.kernel32.GetConsoleWindow()
-    if _h:
-        ctypes.windll.user32.ShowWindow(_h, 0)
-except Exception:
-    pass
+import os as _os
+if _os.name == "nt":
+    try:
+        import ctypes as _ctypes
+        _h = _ctypes.windll.kernel32.GetConsoleWindow()
+        if _h:
+            _ctypes.windll.user32.ShowWindow(_h, 0)
+    except Exception:
+        pass
 
 import subprocess
 import sys
@@ -21,6 +23,7 @@ import time
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE))
 PY = sys.executable
 PORT = 8787
 
@@ -71,26 +74,9 @@ def ensure() -> bool:
     #   Windows SO_REUSEADDR 允许两进程同绑 8787，端口法只杀一个会留冗余实例累积；
     #   且杀共享 socket 组中的单个会导致监听中断——必须全杀后单实例重启）
     try:
-        import subprocess as sp
-        _cmdline = ""
-        try:
-            _cmdline = sp.run(["wmic", "process", "where", "name='python.exe'", "get", "ProcessId,CommandLine"],
-                              capture_output=True, text=True, errors="replace", timeout=15).stdout or ""
-        except Exception:
-            _cmdline = ""
-        if "deck_server.py" not in _cmdline:
-            try:
-                _cmdline = sp.run(
-                    ["powershell", "-NoProfile", "-Command",
-                     "(Get-CimInstance Win32_Process -Filter \"Name='python.exe'\").CommandLine"],
-                    capture_output=True, text=True, errors="replace", timeout=15).stdout or ""
-            except Exception:
-                _cmdline = ""
-        for line in _cmdline.splitlines():
-            if "deck_server.py" in line:
-                _pid = line.split()[-1].strip()
-                if _pid.isdigit():
-                    sp.run(["taskkill", "/PID", _pid, "/F"], capture_output=True)
+        from data._platform import find_pids_by_cmdline, kill_process
+        for _pid in find_pids_by_cmdline("deck_server.py"):
+            kill_process(_pid)
         time.sleep(2)
     except Exception:
         pass

@@ -1075,7 +1075,7 @@ _PW_PATHS = (
 )
 # ★2026-08-14 因子池产出路径（时间戳名，glob 最新）
 _PW_POOL_PATHS = (
-    Path(r"<home>\Desktop\量化代码库思路库\因子池\output"),
+    BASE / "data" / "factorpool" / "output",
 )
 
 

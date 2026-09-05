@@ -34,16 +34,9 @@ LOCK_FILE = Path(__file__).resolve().parent / "logs" / "bulk_load.lock"
 
 
 def _pid_alive(pid: int) -> bool:
-    """检查 PID 对应的进程是否存活（Windows tasklist 查询）"""
-    try:
-        import subprocess
-        r = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV"],
-            capture_output=True, timeout=15)
-        out = r.stdout.decode("gbk", errors="ignore")
-        return str(pid) in out
-    except Exception:
-        return False  # 查询失败时保守认为不存活（允许启动）
+    """检查 PID 对应的进程是否存活（跨平台：Windows tasklist / POSIX os.kill）。"""
+    from data._platform import pid_alive
+    return pid_alive(pid)
 
 
 def acquire_single_instance_lock() -> bool:

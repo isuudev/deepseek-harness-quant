@@ -32,13 +32,15 @@
 import argparse
 
 # ★2026-08-13 黑框隐藏（总指挥要求：计划任务/常驻进程不弹黑框，运行完自动关闭不留窗）
-try:
-    import ctypes
-    _h = ctypes.windll.kernel32.GetConsoleWindow()
-    if _h:
-        ctypes.windll.user32.ShowWindow(_h, 0)
-except Exception:
-    pass
+import os as _os
+if _os.name == "nt":
+    try:
+        import ctypes as _ctypes
+        _h = _ctypes.windll.kernel32.GetConsoleWindow()
+        if _h:
+            _ctypes.windll.user32.ShowWindow(_h, 0)
+    except Exception:
+        pass
 
 import hashlib
 import json
@@ -94,25 +96,21 @@ def _write_state(state: dict):
 
 
 def _task_enabled() -> bool:
-    """查询计划任务是否启用（Windows 输出可能为 GBK 编码，容错处理）"""
-    try:
-        r = subprocess.run(["schtasks", "/Query", "/TN", TASK_NAME, "/FO", "LIST"],
-                           capture_output=True, timeout=15)
-        out = r.stdout.decode("gbk", errors="ignore") + r.stderr.decode("gbk", errors="ignore")
-        return "禁用" not in out and "Disabled" not in out
-    except Exception:
-        return True  # 查询失败时保守假设启用（由自动熔断兜底）
+    """查询计划任务是否启用（非 Windows 无 schtasks → False）。"""
+    from data._platform import scheduler_supported, task_query
+    if not scheduler_supported():
+        return False
+    out = task_query(TASK_NAME)
+    return "禁用" not in out and "Disabled" not in out
 
 
 def _set_task(enabled: bool) -> bool:
-    """启用/禁用计划任务"""
-    flag = "/Enable" if enabled else "/Disable"
+    """启用/禁用计划任务（非 Windows 无 schtasks → False）。"""
+    from data._platform import task_set
     try:
-        r = subprocess.run(["schtasks", "/Change", "/TN", TASK_NAME, flag],
-                           capture_output=True, timeout=15)
-        return r.returncode == 0
+        return task_set(TASK_NAME, enabled)
     except Exception as e:
-        log(f"计划任务 {flag} 失败: {e}")
+        log(f"计划任务切换失败: {e}")
         return False
 
 

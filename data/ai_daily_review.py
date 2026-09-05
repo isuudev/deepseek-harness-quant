@@ -8,13 +8,15 @@
 用法：python data/ai_daily_review.py [--date YYYY-MM-DD]
 """
 # ★2026-08-13 黑框隐藏（计划任务不弹黑框）
-try:
-    import ctypes
-    _h = ctypes.windll.kernel32.GetConsoleWindow()
-    if _h:
-        ctypes.windll.user32.ShowWindow(_h, 0)
-except Exception:
-    pass
+import os as _os
+if _os.name == "nt":
+    try:
+        import ctypes as _ctypes
+        _h = _ctypes.windll.kernel32.GetConsoleWindow()
+        if _h:
+            _ctypes.windll.user32.ShowWindow(_h, 0)
+    except Exception:
+        pass
 
 import sys
 import json

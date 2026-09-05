@@ -72,8 +72,11 @@ def check_chains() -> list:
 
 
 def check_tasks() -> list:
+    from data._platform import scheduler_supported
     names = ["DSHQuant-DevDriver", "DSHQuant-DailyPipeline", "DSHQuant-FactorDaily",
              "DSHQuant-FactorArchive", "DSHQuant-DeckGuard", "DSHQuant-BreakoutMon"]
+    if not scheduler_supported():
+        return [{"name": n, "ok": True, "issue": "非 Windows，无系统计划任务"} for n in names]
     rows = []
     for n in names:
         r = subprocess.run(["schtasks", "/query", "/tn", n], capture_output=True,

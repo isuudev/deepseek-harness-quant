@@ -15,8 +15,9 @@ BASE = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BASE))
 
 from data.convert_7z_to_parquet import ingest_7z_file, OUT_DIR  # noqa: E402
+from data.cache import minute_download_root
 
-DEFAULT_DIR = Path(r"data/minute/download/【2】2026单年A股分钟日频-持续更新到年底/8.9日更新/2026(1)/每日数据")
+DEFAULT_DIR = minute_download_root() / "【2】2026单年A股分钟日频-持续更新到年底" / "8.9日更新" / "2026(1)" / "每日数据"
 N_WORKERS = 6
 
 

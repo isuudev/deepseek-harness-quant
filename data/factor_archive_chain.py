@@ -18,13 +18,15 @@
 import argparse
 
 # ★2026-08-13 黑框隐藏（总指挥要求：计划任务/常驻进程不弹黑框，运行完自动关闭不留窗）
-try:
-    import ctypes
-    _h = ctypes.windll.kernel32.GetConsoleWindow()
-    if _h:
-        ctypes.windll.user32.ShowWindow(_h, 0)
-except Exception:
-    pass
+import os as _os
+if _os.name == "nt":
+    try:
+        import ctypes as _ctypes
+        _h = _ctypes.windll.kernel32.GetConsoleWindow()
+        if _h:
+            _ctypes.windll.user32.ShowWindow(_h, 0)
+    except Exception:
+        pass
 
 import os
 import subprocess

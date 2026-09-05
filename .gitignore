@@ -1,4 +1,4 @@
-﻿# ---- 环境 ----
+# ---- 环境 ----
 .venv/
 venv/
 __pycache__/
@@ -38,6 +38,7 @@ deck/*.json
 Thumbs.db
 .idea/
 .vscode/
+.trae/
 *.log
 
 # ---- 打包产物 ----

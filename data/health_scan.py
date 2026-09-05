@@ -136,16 +136,16 @@ def main() -> int:
     sched_ok = True
     sched_disabled = []
     try:
-        import subprocess as _sp
-        _r = _sp.run(["schtasks", "/query", "/fo", "LIST", "/v"], capture_output=True, timeout=30)
-        _txt = _r.stdout.decode("gbk", errors="replace") + _r.stderr.decode("gbk", errors="replace")
-        for _t in SCHED_TASKS:
-            _idx = _txt.find(_t)
-            _seg = _txt[_idx:_idx + 400] if _idx >= 0 else ""
-            if "禁用" in _seg or "Disabled" in _seg:
-                sched_disabled.append(_t)
-            elif _idx < 0:
-                sched_disabled.append(_t + "(缺失)")
+        from data._platform import scheduler_supported, task_query_all
+        if scheduler_supported():
+            _txt = task_query_all()
+            for _t in SCHED_TASKS:
+                _idx = _txt.find(_t)
+                _seg = _txt[_idx:_idx + 400] if _idx >= 0 else ""
+                if "禁用" in _seg or "Disabled" in _seg:
+                    sched_disabled.append(_t)
+                elif _idx < 0:
+                    sched_disabled.append(_t + "(缺失)")
         if sched_disabled:
             sched_ok = False
             bad.append(f"计划任务禁用/缺失: {','.join(sched_disabled)}")

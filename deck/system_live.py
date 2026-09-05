@@ -194,6 +194,9 @@ def _next_schedule() -> list:
     改为容错解析：手写拆分（年/月/日/时/分/秒）→ datetime；任何失败返回 None 不抛错。"""
     out = []
     try:
+        from data._platform import scheduler_supported
+        if not scheduler_supported():
+            return out
         import re as _re
         from datetime import datetime as _dt
         for name, desc in SCHEDULED_TASKS:

@@ -15,13 +15,15 @@
 import argparse
 
 # ★2026-08-13 黑框隐藏（总指挥要求：计划任务/常驻进程不弹黑框，运行完自动关闭不留窗）
-try:
-    import ctypes
-    _h = ctypes.windll.kernel32.GetConsoleWindow()
-    if _h:
-        ctypes.windll.user32.ShowWindow(_h, 0)
-except Exception:
-    pass
+import os as _os
+if _os.name == "nt":
+    try:
+        import ctypes as _ctypes
+        _h = _ctypes.windll.kernel32.GetConsoleWindow()
+        if _h:
+            _ctypes.windll.user32.ShowWindow(_h, 0)
+    except Exception:
+        pass
 
 import subprocess
 import sys
@@ -35,9 +37,11 @@ sys.path.insert(0, str(BASE))
 
 PY = sys.executable
 
+from data.cache import minute_download_root
+
 # ★2026-08-10 自动发现最新更新目录：用户每日数据更新会生成新目录（如 8.10日更新）
 #   硬编码会漏新数据 → glob 匹配 "*日更新*" 取修改时间最新者
-_UPDATE_ROOT = Path(r"data/minute/download/【2】2026单年A股分钟日频-持续更新到年底")
+_UPDATE_ROOT = minute_download_root() / "【2】2026单年A股分钟日频-持续更新到年底"
 
 
 def resolve_minute_dir() -> str:
@@ -54,7 +58,7 @@ def resolve_minute_dir() -> str:
     if cands:
         cands.sort(reverse=True)
         return str(cands[0][1])
-    return r"data/minute/download/【2】2026单年A股分钟日频-持续更新到年底/8.9日更新/2026(1)/每日数据"
+    return str(_UPDATE_ROOT / "8.9日更新" / "2026(1)" / "每日数据")
 
 
 DEFAULT_MINUTE_DIR = resolve_minute_dir()
