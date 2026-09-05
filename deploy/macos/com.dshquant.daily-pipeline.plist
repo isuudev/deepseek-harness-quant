@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.dshquant.daily-pipeline</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/isuu/Projects/deepseek-harness-quant/.venv/bin/python</string>
+        <string>-X</string>
+        <string>utf8</string>
+        <string>/Users/isuu/Projects/deepseek-harness-quant/data/daily_pipeline.py</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/isuu/Projects/deepseek-harness-quant</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>LWQUANT_CACHE_DIR</key>
+        <string>/Users/isuu/Projects/deepseek-harness-quant/data/cache</string>
+        <key>PATH</key>
+        <string>/Users/isuu/Projects/deepseek-harness-quant/.venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+    </dict>
+
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>18</integer>
+        <key>Minute</key>
+        <integer>30</integer>
+    </dict>
+
+    <key>StandardOutPath</key>
+    <string>/Users/isuu/Projects/deepseek-harness-quant/logs/launchd-daily-pipeline.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/Users/isuu/Projects/deepseek-harness-quant/logs/launchd-daily-pipeline.err.log</string>
+
+    <key>RunAtLoad</key>
+    <false/>
+</dict>
+</plist>
