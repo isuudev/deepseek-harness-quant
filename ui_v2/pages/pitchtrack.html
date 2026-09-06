@@ -61,12 +61,14 @@
 </div>
 
 <script src="/v2/core/api.js"></script>
+<script src="/v2/core/render.js"></script>
 <script src="/v2/components/sidebar.js"></script>
 <script src="/v2/components/icons.js"></script>
 <script>
 (function () {
   /* ★2026-08-16 修复：侧栏渲染调用缺失导致点进远期页菜单消失——与全站统一 */
   LW.sidebar.render('sidebar', { active: 'pitchtrack' });
+  var R = LW.render;
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -128,7 +130,7 @@
       function detailRows(list) {
         return list.map(function (o) {
           var f = o.fwd || {};
-          var typeTxt = R.otypeCN && R.otypeCN[o.otype] ? R.otypeCN[o.otype] : o.otype;
+          var typeTxt = R.otypeCN ? R.otypeCN(o.otype) : o.otype;
           var niuTxt = o.pool_type === 'niu_select' ? (o.persona_name ? ' · ' + o.persona_name : '') : '';
           return '<tr><td><b>' + R._f(o.code) + '</b> ' + R._f(o.name).slice(0, 6) + niuTxt + '</td>' +
             '<td><span class="vtag" style="background:rgba(94,106,210,.12);color:#8b5cf6">' + R._f(typeTxt) + '</span></td>' +
