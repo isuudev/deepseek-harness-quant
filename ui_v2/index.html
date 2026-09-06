@@ -22,7 +22,7 @@
 <body style="background:var(--bg);margin:0">
 <div id="sidebar"></div>
 <div class="v2-wrap">
-  <div class="v2-h"><span class="bar"></span><h1>UI v2 骨架</h1><span class="sub">骨架已就位 · 5 页建设中 · 引擎/API 零改动</span></div>
+  <div class="v2-h"><span class="bar"></span><h1>UI v2</h1><span class="sub">12 页已上线 · API 驱动 · 引擎零改动（★2026-09-06 修正：旧文案「建设中」已过时）</span></div>
   <div class="mini" style="opacity:.7">本页验证：标准 CSS 引用  / 统一 API 客户端  / 渲染兜底  / 顶栏状态条 </div>
 
   <div class="v2-grid" id="page-grid"></div>
@@ -39,13 +39,20 @@
 <script src="/v2/core/render.js"></script>
 <script src="/v2/components/sidebar.js"></script>
 <script>
-// 5 页入口（V2-V6 建设中，占位）
+// ★2026-09-06 修正：12 页均已上线（deck_server 路由 → /v2/pages/*.html），状态统一「在线」
 var PAGES = [
-  { u: '/v2/pages/portal.html', i: '', n: '门户', s: 'V2 · 建设中' },
-  { u: '/v2/pages/pitch.html', i: '', n: '决策', s: 'V3 · 建设中' },
-  { u: '/v2/pages/holdings.html', i: '', n: '持仓', s: 'V4 · 建设中' },
-  { u: '/v2/pages/factors.html', i: '', n: '因子池', s: 'V5 · 建设中' },
-  { u: '/v2/pages/help.html', i: '', n: '说明', s: 'V6 · 建设中' }
+  { u: '/v2/pages/portal.html', i: '', n: '门户', s: '在线' },
+  { u: '/v2/pages/pitch.html', i: '', n: '决策', s: '在线' },
+  { u: '/v2/pages/holdings.html', i: '', n: '持仓', s: '在线' },
+  { u: '/v2/pages/factors.html', i: '', n: '因子池', s: '在线' },
+  { u: '/v2/pages/help.html', i: '', n: '说明', s: '在线' },
+  { u: '/v2/pages/report.html', i: '', n: '日报', s: '在线' },
+  { u: '/v2/pages/data.html', i: '', n: '数据资产', s: '在线' },
+  { u: '/v2/pages/backtest.html', i: '', n: '回测', s: '在线' },
+  { u: '/v2/pages/subj_quant.html', i: '', n: '主观量化', s: '在线' },
+  { u: '/v2/pages/control.html', i: '', n: '控制台', s: '在线' },
+  { u: '/v2/pages/etf.html', i: '', n: 'ETF 映射', s: '在线' },
+  { u: '/v2/pages/pitchtrack.html', i: '', n: '远期池', s: '在线' }
 ];
 var grid = document.getElementById('page-grid');
 grid.innerHTML = PAGES.map(function (p) {

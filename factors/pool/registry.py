@@ -31,7 +31,11 @@ from pathlib import Path
 BASE = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(BASE))
 
-DB_PATH = BASE / "data" / "cache" / "factor_pool.db"
+# ★2026-09-06 修复：DB 路径统一走 data/cache.py 的缓存目录解析（env LWQUANT_CACHE_DIR > params.yaml > 默认 data/cache），
+#   与 bars.db 等保持一致；旧硬编码 BASE/data/cache 在用户自定义缓存目录时因子池会写到错误位置。
+from data.cache import CACHE_DIR
+
+DB_PATH = CACHE_DIR / "factor_pool.db"
 
 STATUSES = ("candidate", "evaluating", "active", "monitoring", "retired")
 KINDS = ("cross_sectional", "time_series")

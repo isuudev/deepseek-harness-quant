@@ -23,6 +23,37 @@ BASE = Path(__file__).resolve().parent.parent
 ARCHIVE_DIR = BASE / "output" / "backtest_archive"
 
 
+def _disclosure(params: dict = None) -> dict:
+    """★2026-09-06 回测口径披露（R1 审计修复⑥：归档 JSON 必须自带口径字段，防口径漂移）
+
+    执行口径 / 成本模型 / 数据边界 / 结论分级，与 backtest-acceptance skill 定稿一致。
+    params 未传成本时回退 config/params.yaml backtest 段，再回退代码默认。"""
+    p = params or {}
+    bt_cfg = {}
+    try:
+        import sys as _s
+        from pathlib import Path as _P
+        _b = _P(__file__).resolve().parent.parent
+        _s.path.insert(0, str(_b))
+        from data.config import load_params
+        bt_cfg = (load_params().get("backtest", {}) or {})
+    except Exception:
+        pass
+    return {
+        "execution": "T+1 开盘执行：信号日收盘选股，次日开盘成交",
+        "one_word_filter": "一字板过滤：涨停开盘无法买入则跳过",
+        "cost_model": {
+            "commission_bps": p.get("commission_bps", bt_cfg.get("commission_bps", 2.6)),
+            "stamp_tax": p.get("stamp_tax", bt_cfg.get("stamp_tax", 0.0005)),
+            "slippage": p.get("slippage", bt_cfg.get("slippage", 0.001)),
+            "note": "双边佣金万 2.6 / 卖出印花税 0.05% / 滑点 0.1%（与 config/params.yaml 一致）",
+        },
+        "data_boundary": "本地 bars.db qfq；换手率 2019 前缺失——2019 前换手类结论一律作废",
+        "survivorship": "尽力含退市股；数据覆盖不足时如实披露",
+        "verdict_level": "结论分级：verdict 按年化正负自动判定，仅供研究参考，不构成投资建议",
+    }
+
+
 def _annual_factor(index):
     """按 index 频率推断年化因子：日线 252，周 52，月 12，否则 252"""
     if len(index) < 2:
@@ -158,6 +189,7 @@ def archive(returns: pd.Series, params: dict = None, metrics: dict = None,
         "factors": factors or [], "strategy": (params or {}).get("strategy", ""),
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "params": params or {}, "metrics": metrics,
+        "口径披露": _disclosure(params),   # ★2026-09-06 口径披露字段（R1 审计修复⑥）
         "returns": _series_to_records(r),
         "benchmark": _series_to_records(pd.Series(benchmark)) if benchmark is not None else [],
     }
@@ -188,6 +220,7 @@ def save_latest(key: str, returns: pd.Series, params: dict = None, metrics: dict
         "factors": factors or [], "strategy": (params or {}).get("strategy", ""),
         "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
         "params": params or {}, "metrics": metrics,
+        "口径披露": _disclosure(params),   # ★2026-09-06 口径披露字段（R1 审计修复⑥）
         "returns": _series_to_records(r),
         "benchmark": _series_to_records(pd.Series(benchmark)) if benchmark is not None else [],
         "is_latest": True, "key": key,
