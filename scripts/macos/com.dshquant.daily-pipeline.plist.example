@@ -6,6 +6,7 @@
   其他任务同理改 Label/ProgramArguments/StartCalendarInterval：
     com.dshquant.after-close   → data/after_close_scan.py   17:35（盘后机会扫描）
     com.dshquant.factor-daily  → 因子池每日（19:15）
+    com.dshquant.daily-report  → data/daily_report_auto.py 工作日 20:00（自动选股+日报，见 daily-report 模板）
     com.dshquant.devdriver     → 巡检（每 4h，用 StartInterval 14400）
     com.dshquant.deck-guard    → deck/ensure_deck.py（每 30min，用 StartInterval 1800）
 -->

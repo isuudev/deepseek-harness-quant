@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  scripts/macos/com.dshquant.daily-report.plist.example — 自动选股 + 日报自动化 20:00（macOS launchd 模板）
+  对应 Windows 计划任务 DSHQuant-AIReview：跑 data/daily_report_auto.py
+  （自动选股入 D 池 ai_select + 生成 report/daily_report_YYYY-MM-DD.md，看板「日报」页读它）。
+  Weekday 1-5 = 周一~周五（与主系统「周末跳过」约定对齐；脚本本身无周末判断，靠这里控制）。
+  安装方式见 docs/macOS定时管道.md。
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dshquant.daily-report</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/data/daily_report_auto.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant</string>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>20</integer>
+    <key>Minute</key>
+    <integer>0</integer>
+    <key>Weekday</key>
+    <array>
+      <integer>1</integer>
+      <integer>2</integer>
+      <integer>3</integer>
+      <integer>4</integer>
+      <integer>5</integer>
+    </array>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/logs/daily_report_launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/logs/daily_report_launchd.err</string>
+</dict>
+</plist>

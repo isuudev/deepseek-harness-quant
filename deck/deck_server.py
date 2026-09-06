@@ -714,7 +714,7 @@ class Handler(BaseHTTPRequestHandler):
                 import glob as _gr
                 _fs = sorted(_gr.glob(str(BASE / "report" / "daily_report_*.md")), key=lambda x: Path(x).stat().st_mtime)
                 if not _fs:
-                    return self._send_json({"ok": False, "error": "日报未生成（等 19:00 自动化）"}, 404)
+                    return self._send_json({"ok": False, "error": "日报未生成（跑 data/daily_report_auto.py 或等 20:00 日报自动化）"}, 404)
                 _md = Path(_fs[-1]).read_text(encoding="utf-8")
                 _date = re.search(r"daily_report_(\d{4}-\d{2}-\d{2})\.md", _fs[-1]).group(1) if re.search(r"daily_report_(\d{4}-\d{2}-\d{2})\.md", _fs[-1]) else ""
                 return self._send_json({"ok": True, "date": _date, "markdown": _md,
