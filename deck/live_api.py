@@ -534,10 +534,15 @@ def portfolio_pnl() -> dict:
     for p in positions:
         code = p.get("code", "")
         entry = p.get("entry_price")
+        # ★2026-09-06 修复：_entry_price_of 已改返回 (price, note) 元组（R2 回退链），
+        #   此处必须解包；另做 tuple 防御（任何历史脏数据直接取首元素）
+        if isinstance(entry, tuple):
+            entry = entry[0]
         if entry is None:
-            entry = _entry_price_of(code, p.get("entry_date", ""))
+            entry, _note = _entry_price_of(code, p.get("entry_date", ""))
             if entry is not None:
                 p["entry_price"] = entry
+                p["entry_price_note"] = _note
                 changed = True
         # 实时价优先（盘中），否则日线最新收盘
         last = None
