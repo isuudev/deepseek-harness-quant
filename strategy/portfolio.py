@@ -56,20 +56,40 @@ MAX_POSITIONS = int(load_params().get("risk", {}).get("max_positions", 5) or 5) 
 
 
 def _entry_price_of(code: str, date: str):
-    """★2026-08-11 百轮#38：从 bars.db 取该股 date 当日收盘价（immutable 快速连接）
-    审批买入价自动补——持仓有 entry_price 才能算收益/盈亏/收益率"""
+    """★2026-08-11 百轮#38：从 bars.db 取买入价（immutable 快速连接）
+    ★2026-09-06 回退链：T+1 开盘（执行口径）→ 决策日收盘 → 最近收盘（数据滞后兜底）。
+    返回 (price, note)；全部取不到返回 (None, None)。"""
     try:
         import sqlite3
         from data.cache import CACHE_DIR
         con = sqlite3.connect(f"file:{CACHE_DIR / 'bars.db'}?mode=ro&immutable=1",
                               uri=True, timeout=3)
-        row = con.execute(
-            "SELECT close FROM daily_bar WHERE code=? AND date=? ORDER BY adjust DESC LIMIT 1",
-            (code, date)).fetchone()
-        con.close()
-        return float(row[0]) if row and row[0] else None
+        try:
+            def _q(sql, args):
+                row = con.execute(sql, args).fetchone()
+                return float(row[0]) if row and row[0] else None
+            # 1) T+1 执行口径：下一交易日的开盘价
+            nxt = _q("SELECT open FROM daily_bar WHERE code=? AND date>? ORDER BY date ASC LIMIT 1",
+                     (code, date or ""))
+            if nxt is not None:
+                return nxt, "T+1 开盘价（bars）"
+            # 2) 决策日收盘
+            cls = _q("SELECT close FROM daily_bar WHERE code=? AND date=? ORDER BY adjust DESC LIMIT 1",
+                     (code, date or ""))
+            if cls is not None:
+                return cls, "决策日收盘（bars）"
+            # 3) 决策日前最近收盘（数据滞后于决策日时兜底，仅作展示参考）
+            last = _q("SELECT close FROM daily_bar WHERE code=? AND date<=? ORDER BY date DESC LIMIT 1",
+                      (code, date or ""))
+            if last is not None:
+                return last, "最近收盘兜底（决策日无 bar，作展示参考）"
+            # 4) 全库最新收盘
+            last2 = _q("SELECT close FROM daily_bar WHERE code=? ORDER BY date DESC LIMIT 1", (code,))
+            return (last2, "全库最新收盘兜底") if last2 is not None else (None, None)
+        finally:
+            con.close()
     except Exception:
-        return None
+        return None, None
 
 
 def _latest_close_of(code: str):
@@ -139,6 +159,25 @@ def _risk_map() -> dict:
 
 
 # ============ B-11 配合：otype / stop_plan（AI-1 提供，AI-2 的 position_stop_check 只读消费） ============
+
+# ★2026-09-06 内置定稿口径兜底（stop_matrix_v2.json 缺失时使用；口径 = 资产盘点 §2.2 实证结论）
+STOP_DEFAULTS = {
+    "breakout": {"stop_loss_pct": 0.10, "time_stop_weeks": None,
+                 "max_drawdown_pct": None, "trailing_ma": None,
+                 "stop_loss_pct_note": "定稿口径：10% 硬止损保留（实证：夏普 0.81→1.39，回撤 -29%→-8%）"},
+    "reversal": {"stop_loss_pct": None, "time_stop_weeks": None,
+                 "max_drawdown_pct": None, "trailing_ma": None,
+                 "stop_loss_pct_note": "定稿口径：删硬止损，改 ATR 3× + 时间止损（硬止损猎杀率 40% 假止损）"},
+    "pv_consensus": {"stop_loss_pct": None, "time_stop_weeks": None,
+                     "max_drawdown_pct": None, "trailing_ma": None,
+                     "stop_loss_pct_note": "定稿口径：无硬止损，逻辑止损（共识瓦解）——硬止损摧毁：夏普 0.40→-1.38"},
+    "quality_gap": {"stop_loss_pct": None, "time_stop_weeks": None,
+                    "max_drawdown_pct": None, "trailing_ma": None,
+                    "stop_loss_pct_note": "定稿口径：无硬止损，逻辑止损（质量破位）——硬止损摧毁：夏普 0.65→-0.89"},
+    "_default": {"stop_loss_pct": None, "time_stop_weeks": None,
+                 "max_drawdown_pct": None, "trailing_ma": None,
+                 "stop_loss_pct_note": "未登记类型：无止损计划（人工复核）"},
+}
 
 def _load_stop_matrix() -> dict:
     """止损矩阵 v2（分包2 交付）：{otype: {stop_loss_pct/time_stop_weeks/max_drawdown_pct/trailing_ma}}"""
@@ -221,9 +260,13 @@ def _risk_gate(code: str, holdings: list, sector_map: dict):
 
 
 def stop_plan_for(otype, matrix: dict = None) -> dict:
-    """按 otype 从止损矩阵 v2 生成 stop_plan（无 otype/矩阵缺失 → _default 兜底）"""
+    """按 otype 从止损矩阵 v2 生成 stop_plan；矩阵缺失时回退内置定稿口径（STOP_DEFAULTS）。
+
+    ★2026-09-06 内置兜底：open 版仓库不随发 stop_matrix_v2.json（分包2 交付物），
+    旧行为导致所有持仓止损计划全 null——现按资产盘点 §2.2 实证定稿口径填充。"""
     matrix = matrix if matrix is not None else _load_stop_matrix()
-    row = matrix.get(otype) or matrix.get("_default") or {}
+    row = matrix.get(otype) or matrix.get("_default") or STOP_DEFAULTS.get(otype) or STOP_DEFAULTS["_default"]
+    from_file = bool(matrix)
     return {
         "otype": otype or "unknown",
         "stop_loss_pct": row.get("stop_loss_pct"),
@@ -231,7 +274,8 @@ def stop_plan_for(otype, matrix: dict = None) -> dict:
         "max_drawdown_pct": row.get("max_drawdown_pct"),
         "trailing_ma": row.get("trailing_ma"),
         "note": (row.get("stop_loss_pct_note") or "")[:100],
-        "source": "stop_matrix_v2.json（分包2 交付）",
+        "source": "stop_matrix_v2.json（分包2 交付）" if from_file
+                  else "内置定稿口径兜底（stop_matrix_v2.json 缺失；口径同资产盘点 §2.2）",
     }
 
 
@@ -288,11 +332,13 @@ def sync_from_decisions() -> dict:
             pass
         # 去重：同一 code 已 exit 过 → 允许再买（入 history 检查）
         otype = _otype_of(code)           # ★B-11：机会类型（从最新池查）
+        _ep, _ep_note = _entry_price_of(code, rec.get("date") or "")
         pos = {
             "code": code,
             "name": rec.get("name") or _name_of(code) or code,
             "entry_date": rec.get("date") or datetime.now().strftime("%Y-%m-%d"),
-            "entry_price": _entry_price_of(code, rec.get("date") or ""),   # ★2026-08-11 百轮#38：审批日收盘价自动补（原 None 导致收益算不出）
+            "entry_price": _ep,           # ★2026-09-06 回退链：T+1 开盘→决策日收盘→最近收盘
+            "entry_price_note": _ep_note,  # ★2026-09-06 标注价格来源（兜底价仅展示参考）
             "target": rec.get("target"),
             "stop": rec.get("stop"),
             "otype": otype,               # ★B-11：AI-2 自动止损引擎按此查止损计划

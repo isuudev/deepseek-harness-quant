@@ -701,7 +701,10 @@ class Handler(BaseHTTPRequestHandler):
                 # ★2026-08-11 审批链路修复：/api/decisions 无文件时返回 []（前端审批页依赖空数组初始化）
                 if path == "/api/decisions":
                     return self._send_json([])
-                return self._send_json({"error": f"文件不存在: {f.name if f else path}", "hint": "先运行对应产出脚本"}, 404)
+                # ★2026-09-06 优雅降级：加 empty/hint 字段（前端可渲染「暂无数据」而非裸错误）
+                return self._send_json({"error": f"文件不存在: {f.name if f else path}",
+                                        "empty": True,
+                                        "hint": "先运行对应产出脚本（logs/output/report 产物缺失）"}, 404)
             try:
                 return self._send_json(json.loads(f.read_text(encoding="utf-8")))
             except Exception as e:

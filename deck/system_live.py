@@ -100,22 +100,51 @@ def _dev_auto_tail(n=8) -> list:
 
 _sched_cache = {"ts": 0, "data": None}
 
+# ★2026-09-06 macOS 移植：Windows 任务名 → launchd 标签映射（模板见 scripts/macos/*.plist.example）
+LAUNCHD_TASK_LABELS = {
+    "LWQuant-DevDriver": "com.dshquant.devdriver",
+    "LWQuant-AfterCloseScan": "com.dshquant.after-close",
+    "LWQuant-FactorDaily": "com.dshquant.factor-daily",
+    "LWQuant-DailyPipeline": "com.dshquant.daily-pipeline",
+    "LWQuant-DeckGuard": "com.dshquant.deck-guard",
+}
+
 
 def _scheduled() -> dict:
-    """计划任务下次运行时间（5 分钟缓存，schtasks 慢会阻塞 API）"""
+    """计划任务状态（5 分钟缓存，schtasks/launchctl 慢会阻塞 API）。
+
+    ★2026-09-06 平台化：Windows 走 schtasks（gbk 输出）；
+    macOS 走 launchctl list（未注册显示「未安装」而非 ERR）；
+    其他 POSIX 显示「平台不支持」——不再在非 Windows 上对 5 个任务报 ERR。
+    """
     now = time.time()
     if _sched_cache["data"] is not None and now - _sched_cache["ts"] < 300:
         return _sched_cache["data"]
     out = {}
-    for name, desc in SCHEDULED_TASKS:
+    if sys.platform.startswith("win"):
+        for name, desc in SCHEDULED_TASKS:
+            try:
+                r = subprocess.run(["schtasks", "/Query", "/TN", name, "/FO", "LIST", "/V"],
+                                   capture_output=True, text=True, errors="replace",
+                                   encoding="gbk", timeout=8)
+                m = re.search(r"下次运行时间:\s*(.+)", r.stdout)
+                out[name] = {"desc": desc, "next": m.group(1).strip() if m else "—"}
+            except Exception as e:
+                out[name] = {"desc": desc, "next": f"ERR {str(e)[:30]}"}
+    elif sys.platform == "darwin":
         try:
-            r = subprocess.run(["schtasks", "/Query", "/TN", name, "/FO", "LIST", "/V"],
-                               capture_output=True, text=True, errors="replace",
-                               encoding="gbk", timeout=8)
-            m = re.search(r"下次运行时间:\s*(.+)", r.stdout)
-            out[name] = {"desc": desc, "next": m.group(1).strip() if m else "—"}
-        except Exception as e:
-            out[name] = {"desc": desc, "next": f"ERR {str(e)[:30]}"}
+            r = subprocess.run(["launchctl", "list"], capture_output=True, text=True,
+                               errors="replace", timeout=8)
+            labels = set(r.stdout.split())
+        except Exception:
+            labels = set()
+        for name, desc in SCHEDULED_TASKS:
+            label = LAUNCHD_TASK_LABELS.get(name, "com.dshquant." + name.lower())
+            out[name] = {"desc": desc,
+                         "next": "已注册" if label in labels else "未安装（launchd 任务未注册，模板见 scripts/macos/）"}
+    else:
+        for name, desc in SCHEDULED_TASKS:
+            out[name] = {"desc": desc, "next": "平台不支持（请用 cron/systemd 自行调度）"}
     _sched_cache["ts"] = now
     _sched_cache["data"] = out
     return out
@@ -158,11 +187,25 @@ def _api_health() -> dict:
 
 
 def _deck_pid() -> int:
+    """Deck(:8787) 监听进程 PID（★2026-09-06 平台化：Windows netstat / POSIX lsof+pgrep）"""
     try:
-        r = subprocess.run(["netstat", "-ano"], capture_output=True, text=True, errors="replace", timeout=15)
-        for line in r.stdout.splitlines():
-            if ":8787" in line and "LISTENING" in line:
-                return int(line.split()[-1])
+        if sys.platform.startswith("win"):
+            r = subprocess.run(["netstat", "-ano"], capture_output=True, text=True,
+                               errors="replace", timeout=15)
+            for line in r.stdout.splitlines():
+                if ":8787" in line and "LISTENING" in line:
+                    return int(line.split()[-1])
+        else:
+            r = subprocess.run(["lsof", "-nP", "-iTCP:8787", "-sTCP:LISTEN", "-t"],
+                               capture_output=True, text=True, errors="replace", timeout=10)
+            pids = [ln.strip() for ln in (r.stdout or "").splitlines() if ln.strip().isdigit()]
+            if pids:
+                return int(pids[0])
+            r2 = subprocess.run(["pgrep", "-f", "deck_server"],
+                                capture_output=True, text=True, errors="replace", timeout=10)
+            for ln in (r2.stdout or "").splitlines():
+                if ln.strip().isdigit():
+                    return int(ln.strip())
     except Exception:
         pass
     return 0

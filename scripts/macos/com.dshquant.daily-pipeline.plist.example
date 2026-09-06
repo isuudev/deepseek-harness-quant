@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  scripts/macos/com.dshquant.daily-pipeline.plist.example — 每日全链管道 18:30（macOS launchd 模板）
+  对应 Windows 计划任务 LWQuant-DailyPipeline。安装方式见 docs/macOS定时管道.md。
+  其他任务同理改 Label/ProgramArguments/StartCalendarInterval：
+    com.dshquant.after-close   → data/after_close_scan.py   17:35（盘后机会扫描）
+    com.dshquant.factor-daily  → 因子池每日（19:15）
+    com.dshquant.devdriver     → 巡检（每 4h，用 StartInterval 14400）
+    com.dshquant.deck-guard    → deck/ensure_deck.py（每 30min，用 StartInterval 1800）
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dshquant.daily-pipeline</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/data/daily_pipeline.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant</string>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>18</integer>
+    <key>Minute</key>
+    <integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/logs/daily_pipeline_launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/logs/daily_pipeline_launchd.err</string>
+</dict>
+</plist>

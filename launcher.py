@@ -82,11 +82,21 @@ def _open_browsers():
 def main():
     base = base_dir()
     if not os.environ.get("LWQUANT_CACHE_DIR"):
-        os.environ["LWQUANT_CACHE_DIR"] = str(base / "data")
+        # ★2026-09-06 修复：默认缓存目录 = data/cache（与 data/cache.py 默认值、params.yaml data.cache_dir 一致；
+        #   旧值 data/ 会导致 DEFAULT_DB 指向 data/bars.db，而真实库在 data/cache/bars.db → 读库落空）
+        os.environ["LWQUANT_CACHE_DIR"] = str(base / "data" / "cache")
     data_dir = os.environ["LWQUANT_CACHE_DIR"]
     print(f"[QuantDeck] 数据目录: {data_dir}")
     if not (Path(data_dir) / "bars.db").exists():
         print("[QuantDeck] 提示: 未检测到 bars.db —— 请先获取数据（docs/快速开始.md §3），或使用演示数据模式")
+    # ★2026-09-06 单库化残留提示：bars_incr*.db 已不被代码读写（见 data/cache.py 单库化说明）
+    try:
+        _legacy = sorted(Path(data_dir).glob("bars_incr*.db")) if Path(data_dir).exists() else []
+        for _lf in _legacy:
+            print(f"[QuantDeck] 提示: 检测到旧版双库残留 {_lf.name}（2026-09 已单库化，代码不再读写）——"
+                  "确认无未入库增量后，可运行 python data/audit_data_assets.py 复核并手动归档到 data/trash/")
+    except Exception:
+        pass
 
     start_harness(base)                 # HARNESS（可选，:3080）
     threading.Thread(target=_open_browsers, daemon=True).start()

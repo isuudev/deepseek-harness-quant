@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  scripts/macos/com.dshquant.deck.plist.example — DeepSeek HARNESS Quant · Deck 守护（macOS launchd 模板）
+
+  安装（把下方 /Users/YOUR_USER/... 换成你的项目路径）：
+    cp scripts/macos/com.dshquant.deck.plist.example ~/Library/LaunchAgents/com.dshquant.deck.plist
+    # 编辑 plist 中的路径后：
+    launchctl load ~/Library/LaunchAgents/com.dshquant.deck.plist
+    launchctl list | grep dshquant        # 验证（deck/system_live.py 同步检测此标签）
+  卸载：launchctl unload ~/Library/LaunchAgents/com.dshquant.deck.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.dshquant.deck</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>python3</string>
+    <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/launcher.py</string>
+  </array>
+  <key>WorkingDirectory</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant</string>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>StandardOutPath</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/logs/deck_launchd.log</string>
+  <key>StandardErrorPath</key>
+  <string>/Users/YOUR_USER/Projects/deepseek-harness-quant/logs/deck_launchd.err</string>
+</dict>
+</plist>
