@@ -167,6 +167,14 @@ def main():
                  [PY, "-X", "utf8", str(_sched), "daily"], timeout=2700)
     else:
         log("  ⚠ 外包因子池 scheduler 不存在（路径变更？）→ 跳过补跑")
+    # 2.8) ★外包市场三件套（状态栏 温度/宽度/拥挤度）——外包池未随源码分发，2026-09 起由
+    #     本地重构生成器从 bars.db 实算（data/factorpool/market_products.py，幂等同日覆盖）；
+    #     ticker 60s 轮询 /api/live/timing_dash，产物落盘即亮起，无需重启服务
+    _mp = BASE / "data" / "factorpool" / "market_products.py"
+    if _mp.exists():
+        run_step("市场三件套(温度/宽度/拥挤度)", [PY, "-X", "utf8", str(_mp)], timeout=600)
+    else:
+        log("  ⚠ 市场三件套生成器不存在 → 状态栏温度/宽度/拥挤度保持「—」")
     # 3) 健康巡检
     health_check()
     # 3.5) ★竞价强度信号（T-3 交付物，2026-08-09 接入：分钟增量入库后自动算近 3 月信号存档）
