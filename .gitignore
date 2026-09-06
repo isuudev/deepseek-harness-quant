@@ -16,6 +16,8 @@ harness/home/storages/
 harness/home/profiles/web/node_modules/
 harness/home/.anonymous-user-id
 harness/home/.credentials.yaml
+# ★2026-09-06 R4：牛散对话历史/归档会话（用户数据，勿提交）
+harness/home/quantapi*.json
 
 # ---- 数据（Tushare 协议：不得再分发；请自行获取） ----
 data/cache/
@@ -32,6 +34,10 @@ output/
 report/
 deck/dashboard_*_20*.html
 deck/*.json
+# ★2026-09-06 R4：历史快照（含行情数据快照，数据边界——不进公开仓库）
+deck/archive_old/
+deck/portal_*.html
+deck/system_overview_*.html
 
 # ---- 系统 / IDE ----
 .DS_Store

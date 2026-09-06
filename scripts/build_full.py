@@ -15,11 +15,15 @@ import sys
 import zipfile
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from _release_filter import should_skip, default_out_dir   # ★2026-09-06 R4：安全过滤（数据边界/密钥/用户数据）
+
 ROOT = Path(__file__).resolve().parent.parent
-TOP_SKIP = {"build", "backups", "updates", "__pycache__", ".venv", "dist"}
+# 顶层目录排除（★2026-09-06 增补 .git/.pytest_cache；node_modules 必须保留=HARNESS 运行时）
+TOP_SKIP = {"build", "backups", "updates", "__pycache__", ".venv", "dist", ".git", ".pytest_cache"}
 
 
-def copy_tree(src: Path, dst: Path):
+def copy_tree(src: Path, dst: Path, root_filter: bool = True):
     for root, dirs, files in os.walk(src):
         if root == str(src):
             dirs[:] = [d for d in dirs if d not in TOP_SKIP]
@@ -29,6 +33,9 @@ def copy_tree(src: Path, dst: Path):
         tgt = dst if rel == "." else dst / rel
         tgt.mkdir(parents=True, exist_ok=True)
         for f in files:
+            relf = os.path.relpath(os.path.join(root, f), src).replace("\\", "/")
+            if root_filter and should_skip(relf):
+                continue
             shutil.copy2(os.path.join(root, f), tgt / f)
 
 
@@ -37,17 +44,19 @@ def main():
     ap.add_argument("--py", required=True, help="便携 Python venv 目录")
     ap.add_argument("--node", required=True, help="便携 Node 目录（node.exe 所在）")
     ap.add_argument("--version", default=None)
-    ap.add_argument("--out", default=r"D:\quant-release")
+    ap.add_argument("--out", default=None)
     args = ap.parse_args()
     ver = args.version or (ROOT / "VERSION").read_text(encoding="utf-8").strip()
-    stage = Path(r"D:\quant-release\_full_stage\DSHQuant")
+    out_dir = Path(args.out) if args.out else default_out_dir(ROOT)
+    # ★2026-09-06 修复：暂存目录从硬编码 D:\quant-release 改为 --out 派生（macOS 可跑）
+    stage = out_dir / "_full_stage" / "DSHQuant"
     if stage.exists():
         shutil.rmtree(stage, ignore_errors=True)
     stage.mkdir(parents=True, exist_ok=True)
-    copy_tree(ROOT, stage)
-    copy_tree(Path(args.py), stage / "runtime" / "python")
-    copy_tree(Path(args.node), stage / "runtime" / "node")
-    out = Path(args.out) / f"DSHQuant-v{ver}-Windows-Full.zip"
+    copy_tree(ROOT, stage)                       # 仓库内容（安全过滤）
+    copy_tree(Path(args.py), stage / "runtime" / "python", root_filter=False)
+    copy_tree(Path(args.node), stage / "runtime" / "node", root_filter=False)
+    out = out_dir / f"DSHQuant-v{ver}-Windows-Full.zip"
     if out.exists():
         out.unlink()
     n = 0
