@@ -303,8 +303,10 @@
         (staleApis.length ? ' · <b style="color:var(--gold)">' + staleApis.length + ' 项滞后</b>' : ' · <b style="color:var(--green)">全部正常</b>') + '</span>'
       : '';
     var sem = d.data_semantic || ('最新完整交易日 ' + dd);
-    // 数据日语义色：盘前/盘中=蓝（实时），已更新=绿，滞后=金
-    var semCls = sem.indexOf('已更新') >= 0 ? 'var(--green)' : (sem.indexOf('盘') >= 0 ? 'var(--navy2)' : 'var(--gold)');
+    // 数据日语义色：盘前/盘中=浅蓝（实时），已更新=绿，滞后=金
+    // ★修复：仅匹配「盘前/盘中」，避免「收盘后更新」里的「盘」误命中为实时蓝；
+    //   实时蓝由 --navy2(#5e6ad2) 改为 #93c5fd（与 statusbar.js 一致，避免与摘要条渐变底同色）
+    var semCls = sem.indexOf('已更新') >= 0 ? 'var(--green)' : ((sem.indexOf('盘前') >= 0 || sem.indexOf('盘中') >= 0) ? '#93c5fd' : 'var(--gold)');
     sm.innerHTML =
       '<span class="tm">择时 ' + R._f(tm.level, '—') + ' · ' + R._f(tm.score, '—') + ' 分</span>' +
       '<span class="mini" style="color:' + semCls + ';font-weight:600" title="数据流通状态：日线数据每日 18:30 收盘后由管道更新，盘中显示上一交易日为正常">' + sem + '</span>' +

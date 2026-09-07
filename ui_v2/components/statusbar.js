@@ -32,7 +32,7 @@
           var sem = d.data_semantic || ('数据日 ' + String(day).slice(0, 10));
           s.textContent = '数据日 ' + String(day).slice(0, 10);
           s.title = sem + '（日线每日 18:30 收盘后更新）';
-          s.style.color = sem.indexOf('已更新') >= 0 ? '#4ade80' : (sem.indexOf('盘') >= 0 ? '#93c5fd' : '#f2c94c');
+          s.style.color = sem.indexOf('已更新') >= 0 ? '#4ade80' : ((sem.indexOf('盘前') >= 0 || sem.indexOf('盘中') >= 0) ? '#93c5fd' : '#f2c94c');
         }
         var chain = d && d.chain;
         if (chain) {

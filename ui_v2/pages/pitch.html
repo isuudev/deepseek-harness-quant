@@ -199,8 +199,8 @@
       if (!bar) return;
       var sem = d.data_semantic || '';
       var dd = d.data_date || (d.brief && d.brief.date) || '';
-      var color = sem.indexOf('已更新') >= 0 ? 'var(--green)' : (sem.indexOf('盘') >= 0 ? 'var(--navy2)' : 'var(--gold)');
-      var hot = sem.indexOf('已更新') >= 0 ? '数据已更新到最新' : (sem.indexOf('盘') >= 0 ? '盘中实时行情已就绪' : '等待收盘后更新');
+      var color = sem.indexOf('已更新') >= 0 ? 'var(--green)' : ((sem.indexOf('盘前') >= 0 || sem.indexOf('盘中') >= 0) ? 'var(--navy2)' : 'var(--gold)');
+      var hot = sem.indexOf('已更新') >= 0 ? '数据已更新到最新' : ((sem.indexOf('盘前') >= 0 || sem.indexOf('盘中') >= 0) ? '盘中实时行情已就绪' : '等待收盘后更新');
       bar.style.display = 'block';
       bar.innerHTML = '<b style="color:var(--navy)">数据流通状态：</b>' +
         '<span style="color:' + color + ';font-weight:600">' + (sem || ('最新完整交易日 ' + dd)) + '</span>' +
