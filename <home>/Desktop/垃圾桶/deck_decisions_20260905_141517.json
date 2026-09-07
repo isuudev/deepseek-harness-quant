@@ -1,0 +1,131 @@
+[
+ {
+  "date": "2026-09-05",
+  "code": "600111.SH",
+  "action": "buy",
+  "ts": "2026-09-05 14:15:17",
+  "note": "Pitch 审批买入",
+  "target": null,
+  "stop": null,
+  "env_level": "谨慎买入",
+  "env_score": 48.6,
+  "pitch_meta": {
+   "otype": "quality_gap",
+   "otype_name": "质量折价",
+   "score": 92.7,
+   "factors": {
+    "drawdown_60d": -0.2859,
+    "roe": 0.0802,
+    "liability": 0.3698,
+    "cfo_health": 1,
+    "div_yield": 0.0
+   },
+   "signal_family": "质量",
+   "stop_plan": {
+    "otype": "quality_gap",
+    "stop_loss_pct": null,
+    "time_stop_weeks": 26,
+    "time_stop_min_gain": 0.0,
+    "pivot_check_pct": null,
+    "atr_stop_mult": null,
+    "trailing_ma": null,
+    "max_drawdown_pct": null,
+    "fake_exit_levels": [],
+    "ma60_gate": false,
+    "anti_hunt": {},
+    "logic_fail_rules": [
+     {
+      "name": "质量破位",
+      "rule": "ROE 跌破 10%（年化）",
+      "action": "卖出"
+     },
+     {
+      "name": "现金流恶化",
+      "rule": "CFO/净利润 <0（利润无现金支撑）",
+      "action": "卖出"
+     }
+    ],
+    "desc": "质量破位（ROE<10%/现金流恶化）触发即离场 · 26 周未修复离场 · 回撤超 20% 离场"
+   },
+   "risk_level": "NO_DATA",
+   "risk_flags": [],
+   "winrate_est": 0.704,
+   "upside_est": 62.9,
+   "rank_in_type": 1,
+   "rank_global": 1,
+   "n_types_hit": 2,
+   "also_types": [
+    "事件驱动"
+   ],
+   "evidence": "质量因子+0.048(CS-02)；Oversold Quality 策略实证（个股优选层研究荟萃）；★17年回测实证v2（2011-2026，ROE口径修正后 520 样本）：6月胜率 70.4% / 均收益 +14.6%（7 类最强🏆，logs/17年回测验证报告v2_20260810.md）",
+   "horizons": {
+    "1y": {
+     "n": 21,
+     "winrate": 0.5714,
+     "avg_ret": 0.3568,
+     "med_ret": 0.1543,
+     "max_dd": -0.5417,
+     "pl_ratio": 3.1608,
+     "bench_avg": null,
+     "excess_avg": null,
+     "regime": {
+      "bull": {
+       "n": 0
+      },
+      "base": {
+       "n": 0
+      },
+      "bear": {
+       "n": 0
+      }
+     }
+    },
+    "2y": {
+     "n": 16,
+     "winrate": 0.5,
+     "avg_ret": 0.4254,
+     "med_ret": 0.1116,
+     "max_dd": -0.6333,
+     "pl_ratio": 3.6617,
+     "bench_avg": null,
+     "excess_avg": null,
+     "regime": {
+      "bull": {
+       "n": 0
+      },
+      "base": {
+       "n": 0
+      },
+      "bear": {
+       "n": 0
+      }
+     }
+    },
+    "3y": {
+     "n": 15,
+     "winrate": 0.6667,
+     "avg_ret": 0.5703,
+     "med_ret": 0.8414,
+     "max_dd": -0.7358,
+     "pl_ratio": 2.8041,
+     "bench_avg": null,
+     "excess_avg": null,
+     "regime": {
+      "bull": {
+       "n": 0
+      },
+      "base": {
+       "n": 0
+      },
+      "bear": {
+       "n": 0
+      }
+     }
+    }
+   },
+   "pitch_line": "long",
+   "pitch_sub": "score",
+   "tier": "core"
+  }
+ }
+]

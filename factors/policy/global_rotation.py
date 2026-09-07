@@ -7,13 +7,16 @@
   定位 = 防守卡（A股弱市→提示加配黄金/债券/现金），非强制调仓。
 
 数据源（因子池缓存，只读）：
-  因子池/output/cache/wufu_idx.parquet（4 指数，1847 天）
-  因子池/output/cache/wufu_etf.parquet（9 ETF 代理池，1847 天）
+  data/factorpool/output/cache/wufu_idx.parquet（4 指数，≈1847 天）
+  data/factorpool/output/cache/wufu_etf.parquet（9 ETF 代理池，≈1847 天）
+  缺外部因子池时由 scripts/generate_wufu_cache.py 自举生成（本地库→网络→演示兜底，
+  provenance 逐列标注来源；外部因子池同步后自动覆盖）。
 
 输出：output/global_rotation.json {date, a_share_weak, weak_vote, global_rotation, params}
 接入：门户/择时页读本 JSON 显示「防守卡」；17:35 盘后扫描链可调。
 """
 import json
+import re
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -25,7 +28,8 @@ BASE = Path(__file__).resolve().parent.parent.parent
 if str(BASE) not in sys.path:
     sys.path.insert(0, str(BASE))
 
-CACHE = Path(r"data/factorpool/output/cache")
+# ★2026-09 绝对路径化：相对路径依赖 CWD（deck 服务/定时链 CWD 不一致时读不到缓存）
+CACHE = BASE / "data" / "factorpool" / "output" / "cache"
 OUT = BASE / "output" / "global_rotation.json"
 
 # 级1：四指数（与因子池规格一致）
@@ -35,6 +39,10 @@ ETF_CN = {
     "黄金": "黄金ETF", "纳指": "纳指ETF", "标普500": "标普500ETF", "日经": "日经ETF",
     "德国": "德国ETF", "有色": "有色金属ETF", "豆粕": "豆粕ETF", "黄金2": "黄金ETF2",
     "沪深300": "沪深300ETF",
+    # ★2026-09 缓存自举：干净中文列名直接映射自身（外包池 GBK 乱码列名仍由短名兜底）
+    "黄金ETF": "黄金ETF", "纳指ETF": "纳指ETF", "纳指ETF2": "纳指ETF2",
+    "标普500ETF": "标普500ETF", "日经ETF": "日经ETF", "德国ETF": "德国ETF",
+    "有色金属ETF": "有色金属ETF", "豆粕ETF": "豆粕ETF", "中概互联ETF": "中概互联ETF",
 }
 MIN_HOLD = 3          # 最小持有期（天）
 CONFIRM = 1           # 换仓确认
@@ -110,15 +118,28 @@ def compute() -> dict:
     return out
 
 
+# 外包因子池 GBK 乱码列名时按净值轨迹推断的位置映射（与 2026-08-16 口径一致）
+_FALLBACK_NAMES = ["沪深300ETF", "黄金ETF", "恒指ETF", "中证500ETF", "日经ETF",
+                   "标普500ETF", "纳指ETF", "避险资产", "黄金ETF2"]
+
+
+def _display_names(columns) -> list:
+    """列名干净（过半含中文，无 GBK 乱码）→ 直接用列名；
+    外包因子池乱码列名 → 位置推断兜底。★2026-09 缓存自举后 parquet 为干净中文列名。"""
+    cjk = sum(1 for c in columns if re.search(r"[\u4e00-\u9fff]", str(c)))
+    if cjk and cjk >= len(columns) / 2:
+        return [str(c) for c in columns]
+    return _FALLBACK_NAMES
+
+
 def widget() -> dict:
     """★2026-08-16 五福轮动门户摆件数据：9 只全球 ETF 代理池常态动量面板（不依赖弱市）。
     供 /api/live/wufu_rotation（门户常显摆件；弱市防守建议仍读 global_rotation.json）。
-    列名在因子池生成时损坏（GBK 乱码）→ 按净值轨迹推断的位置映射（沪深300/黄金/恒指/中证500/日经/标普/纳指/德国/黄金2）。"""
+    列名干净时直接用列名；外包因子池 GBK 乱码列名仍按净值轨迹推断的位置映射兜底。"""
     etf = pd.read_parquet(CACHE / "wufu_etf.parquet")
-    # 列名在因子池生成时损坏（GBK 乱码）→ 按净值轨迹 + 相关矩阵推断的位置映射：
+    # ★2026-09 列名干净（含中文）→ 直接用列名；外包因子池 GBK 乱码 → 位置推断兜底：
     # [沪深300, 黄金, 恒指, 中证500, 日经, 标普500, 纳指, 债券/避险(与全资产低相关), 黄金2]
-    names = ["沪深300ETF", "黄金ETF", "恒指ETF", "中证500ETF", "日经ETF",
-             "标普500ETF", "纳指ETF", "避险资产", "黄金ETF2"]
+    names = _display_names(etf.columns)
     ma10e = etf.rolling(MA10_WIN).mean()
     assets = []
     for i, col in enumerate(etf.columns):

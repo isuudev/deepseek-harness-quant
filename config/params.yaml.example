@@ -268,3 +268,24 @@ factor_pool:
   evaluate_on_sched: true         # dev_auto 每轮评估候选+巡检 active
   fetch_on_sched: true            # 每轮刷新政策数据（EPU FRED 全量重下，量小）
   ts_eval_start: "<your-config>" # 时序因子评估起点（覆盖 2020-2025 回测 + 前段滚动窗口）
+
+# ---------- 五福轮动（跨资产轮动 P0 · 因子池缓存自举 2026-09）----------
+# 池定义被 scripts/generate_wufu_cache.py 读取（生成 data/factorpool/output/cache/wufu_*.parquet，
+# 摆件 /api/live/wufu_rotation 消费）；外部因子池同步（scripts/import_factorpool.py）后本配置
+# 仍为自举兜底参考，不冲突。铁律：增删资产改本文件，不改代码。
+wufu_rotation:
+  indices:                      # 级1：A股弱市四指数 MA10 投票（中文名 → baostock 代码）
+    沪深300: "sh.000300"
+    中小综指: "sz.399101"
+    创业板指: "sz.399006"
+    中证A500: "sh.000510"
+  etfs:                         # 级2：9 只全球 ETF 代理池（中文名 → 6 位代码；与 data/fetcher_tushare.py GLOBAL_ETF 同源）
+    黄金ETF: "518880"
+    纳指ETF: "513100"
+    标普500ETF: "513500"
+    日经ETF: "513520"
+    德国ETF: "513030"
+    有色金属ETF: "512400"
+    豆粕ETF: "159985"
+    中概互联ETF: "513050"
+    纳指ETF2: "159941"

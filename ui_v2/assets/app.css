@@ -73,7 +73,8 @@ body { background: radial-gradient(1200px 800px at 70% -10%, rgba(94,106,210,.13
 .v2-btn.neg { background: linear-gradient(135deg, #3f3f46, #52525b); }
 .v2-btn-ghost { background:#131316; color:var(--navy2); border:1px solid #2a2a30 !important; font-weight:600; }
 .v2-btn-ghost:hover { border-color:var(--navy2); box-shadow:none; }
-.v2-btn:disabled { opacity:.5; cursor:wait; }
+.v2-btn:disabled { opacity:.5; cursor:not-allowed; }
+.v2-btn:disabled:hover { transform:none; box-shadow:none; }
 
 /* V7d 审批状态标记（已买入 / 已放弃）+ 撤回按钮 */
 .st-done { font-size:12px; padding:2px 9px; border-radius:6px; font-weight:600; white-space:nowrap; }

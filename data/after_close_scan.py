@@ -63,6 +63,8 @@ def main():
     run_step("机会扫描 --pitch", [PY, str(BASE / "factors" / "opportunities" / "scan.py"), "--pitch"])
     run_step("Pitch v2 Deck", [PY, str(BASE / "factors" / "opportunities" / "pitch_v2.py")])
     run_step("科技线 Pitch v3", [PY, "-X", "utf8", str(BASE / "factors" / "opportunities" / "tech_pitch_v3.py")])
+    # 2.4) 五福轮动缓存自举（wufu_idx/wufu_etf 缺失或过期时生成：本地库→网络→演示兜底，幂等）
+    run_step("五福轮动缓存刷新", [PY, "-X", "utf8", str(BASE / "scripts" / "generate_wufu_cache.py")], timeout=600)
     # 2.5) ★2026-08-14 跨资产轮动防守信号（a_share_weak + global_rotation，因子池 P0 落地）
     run_step("跨资产轮动信号", [PY, "-X", "utf8", str(BASE / "factors" / "policy" / "global_rotation.py")])
     log("=== 盘后机会扫描完成 ===")
