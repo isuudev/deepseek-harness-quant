@@ -405,13 +405,14 @@
         // ★2026-08-12 百轮后#119：行业敞口（持仓行业分布——集中度风险；行业分散提示）
         (function () {
           var ie = d.industry_exposure || {};
-          var keys = Object.keys(ie);
+          var dist = ie.distribution || {};
+          var keys = Object.keys(dist);
           if (!keys.length) return '';
-          var maxN = Math.max.apply(null, keys.map(function (k) { return ie[k]; }));
+          var maxN = Math.max.apply(null, keys.map(function (k) { return dist[k]; }));
           var parts = keys.map(function (k) {
-            var pct = Math.round(ie[k] / (pnl.n_holdings || 1) * 100);
-            var hi = ie[k] >= 2 ? 'style="color:#b0774a"' : '';
-            return '<span ' + hi + '>' + esc(k.replace(/^[A-Z]\d+\s*/, '')) + ' ' + ie[k] + '</span>';
+            var pct = Math.round(dist[k] / (pnl.n_holdings || 1) * 100);
+            var hi = dist[k] >= 2 ? 'style="color:#b0774a"' : '';
+            return '<span ' + hi + '>' + esc(k.replace(/^[A-Z]\d+\s*/, '')) + ' ' + dist[k] + '</span>';
           });
           var warn = maxN >= 2 ? ' <span style="color:#b0774a">⚠️ 有行业集中（' + maxN + ' 只同行业）</span>' : ' <span style="color:#0F6E56">分散良好</span>';
           return '<div class="mini" style="margin-top:6px">🏭 行业敞口：' + parts.join(' ｜ ') + warn + '</div>';

@@ -427,7 +427,7 @@ def live_holdings() -> dict:
         _con = _sq.connect(f"file:{CACHE_DIR / 'stock_basic.db'}?mode=ro&immutable=1", uri=True, timeout=3)
         for _p in pf.get("positions", []):
             _c = _p.get("code", "")
-            if not _p.get("name") or _p["name"] == _c:
+            if not _p.get("name") or _p["name"] == _c or not _p.get("industry"):
                 _r = _con.execute("SELECT name, industry FROM stock_basic WHERE code=?", (_c,)).fetchone()
                 if _r:
                     _p["name"] = _r[0] or _c
@@ -438,11 +438,26 @@ def live_holdings() -> dict:
     # ★2026-08-11 百轮#38：盈亏总览（持仓有 entry_price 才能算；缺失尝试回填）
     pnl = portfolio_pnl()
     # ★2026-08-12 百轮后#119：行业敞口（持仓行业分布——集中度风险可视化；Pitch 候选分布对照）
-    _ind_expo = {}
+    _ind_dist = {}
     try:
+        import re as _re
         for _p in pf.get("positions", []):
-            _ind = _p.get("industry") or "未知"
-            _ind_expo[_ind] = _ind_expo.get(_ind, 0) + 1
+            if _p.get("status") != "holding":
+                continue
+            _ind = (_p.get("industry") or "未知").strip()
+            _ind = _re.sub(r"^[A-Z]\d+\s*", "", _ind) or "未知"
+            _ind_dist[_ind] = _ind_dist.get(_ind, 0) + 1
+    except Exception:
+        pass
+    # ★行业敞口汇总：前端 holdings.html 消费 top_industry / 占比 / flag；distribution 保留完整分布供 live_patch 对照
+    _ind_expo = {"distribution": _ind_dist}
+    try:
+        if _ind_dist:
+            _top_ind, _top_n = max(_ind_dist.items(), key=lambda kv: kv[1])
+            _total = sum(_ind_dist.values())
+            _ind_expo["top_industry"] = _top_ind
+            _ind_expo["top_industry_pct"] = round(_top_n / _total, 4) if _total else 0.0
+            _ind_expo["flag"] = "行业集中" if _top_n >= 2 else "分散良好"
     except Exception:
         pass
     # ★2026-08-11 百轮#40：组合绩效（净值曲线 + 回撤 + 交易统计）
