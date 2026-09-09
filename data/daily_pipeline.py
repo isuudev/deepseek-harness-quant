@@ -247,27 +247,6 @@ def main():
         # ★2026-08-14 科技线收敛（Pitch 改进规格 v2 ③）：tech_pitch_v3 原仅 dev_auto 8.57 调用，
         #   依赖其时序 → 加入主链保证每晚必跑（TECH_TOP_N=6 + 竞价反信号 + 短线标注）
         run_step("科技线 Pitch v3", [PY, "-X", "utf8", str(BASE / "factors" / "opportunities" / "tech_pitch_v3.py")], timeout=1800)
-    # 5) ★实盘持仓止损扫描（B-11 落地 · 外包 AI-2 position_stop_check——2026-08-10 总指导接入）
-    #    定位=持仓执行层（T+1 卖出信号）；池级预警层=dev_auto stop_monitor（stop_alerts）——双引擎分工不重复：
-    #    ★#367 修复：读时间戳 glob 取最新（原读固定名 portfolio.json 是 08-10 旧残留 99 字节 holding=0，
-    #      导致实盘止损/止盈扫描每天被跳过——用户持仓根本没被止损引擎扫到，与"写 v2 读 v1"同坑）
-    _pfs = sorted([Path(p) for p in glob.glob(str(BASE / "logs" / "portfolio_*.json"))],
-                  key=lambda x: x.stat().st_mtime)
-    _pfc = _pfs[-1] if _pfs else None
-    if _pfc and _pfc.exists():
-        try:
-            import json as _j
-            _pd = _j.loads(_pfc.read_text(encoding="utf-8"))
-            _n_hold = sum(1 for x in (_pd.get("positions") or []) if x.get("status") == "holding")
-        except Exception:
-            _n_hold = 0
-        if _n_hold > 0:
-            run_step("实盘止损扫描", [PY, str(BASE / "risk" / "position_stop_check.py")], timeout=600)
-            run_step("实盘止盈扫描", [PY, str(BASE / "risk" / "take_profit_check.py")], timeout=600)   # ★2026-08-11 百轮#4 止盈引擎
-        else:
-            log(f"  实盘止损/止盈扫描跳过（portfolio 无 holding 持仓，当前 {_n_hold} 只）")
-    else:
-        log("  实盘止损扫描跳过（无 portfolio 时间戳文件，未买入）")
     # ★2026-08-11 观察池/决策池数据流补全（百轮#1：用户反馈"观察池数据不通"根因——
     #   pool_layers/daily_signal/远期池/突破监控 不在 17:30 管道链 → 页面停留旧数据 08-10）
     run_step("三层池（观察/候选/决策）", [PY, "-X", "utf8", str(BASE / "strategy" / "pool_layers.py"),
@@ -285,6 +264,31 @@ def main():
     run_step("组合风控（集中度/行业上限）", [PY, "-X", "utf8", str(BASE / "risk" / "position_monitor.py")], timeout=300)   # ★2026-08-11 百轮#11
     run_step("远期池 T+1 填充", [PY, "-X", "utf8", str(BASE / "factors" / "opportunities" / "pitch_track.py")], timeout=1800)
     run_step("突破监控", [PY, "-X", "utf8", str(BASE / "factors" / "opportunities" / "breakout_monitor.py")], timeout=1800)
+    # ★2026-09-09 调整：实盘止损/止盈扫描移到「三层池→远期池→突破监控」之后执行——
+    #   原位置在机会扫描之后，早于持仓定稿，当日新买入持仓（如 revalue 海通发展）
+    #   未被止盈引擎覆盖（止盈 1 vs 持仓 2 假红）。移后止损/止盈在持仓数据更新后再扫。
+    #   ★#367 修复：读时间戳 glob 取最新（原读固定名 portfolio.json 是 08-10 旧残留 99 字节 holding=0，
+    #      导致实盘止损/止盈扫描每天被跳过——用户持仓根本没被止损引擎扫到，与"写 v2 读 v1"同坑）
+    # ★2026-09-09 前置 sync：deck_server 后台 _bg_sync 与管道解耦，审批买入可能已发生但 portfolio
+    #   未落地 → 止盈引擎漏扫新持仓。先 sync 把已审批 buy 落地，再 glob 读最新持仓。
+    run_step("持仓同步（deck_decisions → portfolio）", [PY, "-X", "utf8", str(BASE / "strategy" / "portfolio.py"), "--sync"], timeout=300)
+    _pfs = sorted([Path(p) for p in glob.glob(str(BASE / "logs" / "portfolio_*.json"))],
+                  key=lambda x: x.stat().st_mtime)
+    _pfc = _pfs[-1] if _pfs else None
+    if _pfc and _pfc.exists():
+        try:
+            import json as _j
+            _pd = _j.loads(_pfc.read_text(encoding="utf-8"))
+            _n_hold = sum(1 for x in (_pd.get("positions") or []) if x.get("status") == "holding")
+        except Exception:
+            _n_hold = 0
+        if _n_hold > 0:
+            run_step("实盘止损扫描", [PY, str(BASE / "risk" / "position_stop_check.py")], timeout=600)
+            run_step("实盘止盈扫描", [PY, str(BASE / "risk" / "take_profit_check.py")], timeout=600)   # ★2026-08-11 百轮#4 止盈引擎
+        else:
+            log(f"  实盘止损/止盈扫描跳过（portfolio 无 holding 持仓，当前 {_n_hold} 只）")
+    else:
+        log("  实盘止损扫描跳过（无 portfolio 时间戳文件，未买入）")
     # ★2026-08-11 管道落地验证（8 项：交易日/五强/共识/机会池/拥挤/Pitch分档直通/强因子/短线因子）
     try:
         run_step("管道落地验证", [PY, "-X", "utf8", str(BASE / "data" / "verify_day_pipeline.py")], timeout=300)

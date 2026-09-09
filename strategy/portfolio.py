@@ -406,7 +406,7 @@ def status() -> str:
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="持仓管理（T-2）")
     ap.add_argument("--sync", action="store_true", help="从 deck_decisions 同步买入")
-    ap.add_argument("--sell", nargs="+", metavar=("CODE", "PRICE", "REASON"), help="卖出")
+    ap.add_argument("--sell", nargs="+", metavar="CODE PRICE REASON", help="卖出")
     ap.add_argument("--status", action="store_true")
     args = ap.parse_args()
     if args.sync:
