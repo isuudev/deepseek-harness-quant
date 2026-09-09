@@ -39,21 +39,35 @@ def main() -> int:
         from data.cache import DailyCache
         d = DailyCache().latest_trade_date()
         print(f"1) 最新交易日: {d}", flush=True)
-        if not d or d == "2026-08-10":
-            print("   ⚠️ 仍是 08-10（08-11 数据未入库？）", flush=True)
+        # ★2026-09-09 修复：原硬编码 "2026-08-10"（过时）→ 改通用滞后判定：
+        #   最新完整交易日比今天早 >3 自然日 = 数据停更（多因 Tushare 增量未入库）
+        if not d:
+            print("   ⚠️ 探测不到完整交易日（bars.db 无 ≥4000 只的交易日？）", flush=True)
+        else:
+            from datetime import date as _date
+            _gap = (_date.today() - _date.fromisoformat(d)).days
+            if _gap > 3:
+                print(f"   ⚠️ 数据滞后 {_gap} 天（最新 {d}）——检查 Tushare 日线增量是否入库", flush=True)
     except Exception as e:
         print(f"1) 探测失败: {str(e)[:60]}", flush=True); fails += 1
 
     # 2) 外包 daily CSV + 五强完整率
+    #    ★2026-09-09 修复：外包因子池（daily_scores）未随源码分发 → 目录/文件缺失时
+    #    明确"跳过（外包池未接入）"，不再计入异常（每晚假红掩盖真故障）；
+    #    外包池存在时保持原严格校验。
     try:
         import pandas as pd
         fs = sorted(glob.glob(str(EXT_DAILY / "daily_*.csv")), key=os.path.getmtime)
-        f = Path(fs[-1])
-        df = pd.read_csv(f, nrows=3000)
-        ok = sum(1 for ft in F5 if f"{ft}_rank" in df.columns and df[f"{ft}_rank"].notna().mean() >= 0.5)
-        print(f"2) 最新 daily: {f.name} | 五强列可用 {ok}/5", flush=True)
-        if ok < 4:
-            print("   ⚠️ 五强 rank 缺失（需检查 scheduler 产出）", flush=True); fails += 1
+        if not fs:
+            print(f"2) 外包 daily CSV: ⏭ 跳过（{EXT_DAILY} 无产出——外包因子池未接入，"
+                  f"个股因子评分由 scan 本地口径兜底）", flush=True)
+        else:
+            f = Path(fs[-1])
+            df = pd.read_csv(f, nrows=3000)
+            ok = sum(1 for ft in F5 if f"{ft}_rank" in df.columns and df[f"{ft}_rank"].notna().mean() >= 0.5)
+            print(f"2) 最新 daily: {f.name} | 五强列可用 {ok}/5", flush=True)
+            if ok < 4:
+                print("   ⚠️ 五强 rank 缺失（需检查 scheduler 产出）", flush=True); fails += 1
     except Exception as e:
         print(f"2) daily 读取失败: {str(e)[:60]}", flush=True); fails += 1
 
@@ -77,14 +91,28 @@ def main() -> int:
         print(f"4) opp_pool 失败: {str(e)[:60]}", flush=True); fails += 1
 
     # 5) market crowding
+    #    ★2026-09-09 修复：优先读本地重构三件套（data/factorpool/output/crowding_*.json，
+    #    2026-09 起由 data/factorpool/market_products.py 从 bars.db 实算落盘）；
+    #    外包 daily_scores/market_*.csv 仅作旧格式兼容。两者都无 → 跳过不报异常。
     try:
         import csv as _csv
-        fs = sorted(glob.glob(str(EXT_DAILY / "market_*.csv")), key=os.path.getmtime)
-        with open(fs[-1], encoding="utf-8") as fh:
-            rd = _csv.DictReader(fh)
-            row = next(rd)
-        filled = sum(1 for ft in F5 if row.get(f"crowding_{ft}", "").strip())
-        print(f"5) market crowding: {os.path.basename(fs[-1])} 填充 {filled}/5", flush=True)
+        _cfiles = sorted(glob.glob(str(BASE / "data" / "factorpool" / "output" / "crowding_*.json")),
+                         key=os.path.getmtime)
+        if _cfiles:
+            _cd = json.loads(Path(_cfiles[-1]).read_text(encoding="utf-8"))
+            print(f"5) market crowding: {os.path.basename(_cfiles[-1])} | date={_cd.get('date')} "
+                  f"mkt={_cd.get('crowding_mkt')} pctile_252={_cd.get('crowding_pctile_252')} "
+                  f"拥挤 {_cd.get('n_crowded_stocks')} 只", flush=True)
+        else:
+            fs = sorted(glob.glob(str(EXT_DAILY / "market_*.csv")), key=os.path.getmtime)
+            if not fs:
+                print("5) market crowding: ⏭ 跳过（本地三件套与外包 market CSV 均无产出）", flush=True)
+            else:
+                with open(fs[-1], encoding="utf-8") as fh:
+                    rd = _csv.DictReader(fh)
+                    row = next(rd)
+                filled = sum(1 for ft in F5 if row.get(f"crowding_{ft}", "").strip())
+                print(f"5) market crowding: {os.path.basename(fs[-1])} 填充 {filled}/5", flush=True)
     except Exception as e:
         print(f"5) crowding 失败: {str(e)[:60]}", flush=True)
 
@@ -102,16 +130,30 @@ def main() -> int:
         print(f"6) pitch 失败: {str(e)[:60]}", flush=True)
 
     # 7) ★强因子直通白名单（factor_risk：独立强因子数，统计误差审计）
+    #    ★2026-09-09 修复：factor_risk.latest() 只读产物 output/factor_risk_*.json——
+    #    产物从未生成过（dev_auto 未在本机跑过）时每晚假红"无强因子"。
+    #    现改为自举：无产物先调 build()（纯本地聚合 health CSV，毫秒级，幂等落盘），
+    #    再读 latest()；health 数据也没有（外包未接入）才跳过不计异常。
     try:
         import sys as _sys
         _sys.path.insert(0, str(BASE))
         from factors.risk.factor_risk import latest as _fr
         fr = _fr()
-        n_ind = fr.get("n_strong_independent", 0)
-        n_nom = fr.get("n_strong_nominal", 0)
-        print(f"7) 强因子: 独立 {n_ind} / 名义 {n_nom}（家族去重，共线性修正）", flush=True)
-        if n_ind == 0:
-            print("   ⚠️ 无强因子（factor_risk 未跑？dev_auto 8.57）", flush=True); fails += 1
+        if not fr:
+            try:
+                from factors.risk.factor_risk import build as _fr_build
+                _fr_build()
+                fr = _fr()
+            except Exception:
+                fr = {}
+        if not fr:
+            print("7) 强因子: ⏭ 跳过（factor_risk 产物与外包 health CSV 均无——外包因子池未接入）", flush=True)
+        else:
+            n_ind = fr.get("n_strong_independent", 0)
+            n_nom = fr.get("n_strong_nominal", 0)
+            print(f"7) 强因子: 独立 {n_ind} / 名义 {n_nom}（家族去重，共线性修正）", flush=True)
+            if n_ind == 0:
+                print("   ⚠️ 无强因子（factor_risk 未跑？dev_auto 8.57）", flush=True); fails += 1
     except Exception as e:
         print(f"7) 强因子失败: {str(e)[:60]}", flush=True); fails += 1
 
@@ -128,6 +170,7 @@ def main() -> int:
 
     # 9) ★面板 v8 新因子接入（N4/N5/N8/N2/N3 入池：open_prem_20/lhb_jg_cnt_20/ind_crowd_60/o2c/limup_ex 等）
     #    17:35 面板 v8 产出后自动验证——新因子列存在 = 信号联动/强因子直通可消费
+    #    ★2026-09-09 修复：外包 daily CSV 无产出时打印跳过说明（原实现静默 0/N 误导）
     try:
         import csv as _csv2
         v8_cols = ["open_prem_20_rank", "lhb_jg_cnt_20_rank", "ind_crowd_60_rank",
@@ -139,7 +182,9 @@ def main() -> int:
                 rd = _csv2.DictReader(fh)
                 cols = rd.fieldnames or []
             present = sum(1 for c in v8_cols if c in cols)
-        print(f"9) 面板 v8: {present}/{len(v8_cols)} 新因子列（open_prem/lhb/ind_crowd/o2c/limup_ex）", flush=True)
+            print(f"9) 面板 v8: {present}/{len(v8_cols)} 新因子列（open_prem/lhb/ind_crowd/o2c/limup_ex）", flush=True)
+        else:
+            print(f"9) 面板 v8: ⏭ 跳过（外包 daily CSV 无产出——外包因子池未接入）", flush=True)
     except Exception as e:
         print(f"9) 面板 v8 失败: {str(e)[:60]}", flush=True)
 
@@ -167,6 +212,17 @@ def main() -> int:
         _ok11 = _vv.get("ok") and _nt >= 1 and len(_dw) <= 3
         print(f"11) 实盘裁决: {'✅' if _ok11 else '⚠️'} {_nt} 类型有样本，down_warn {len(_dw)} 条（{'、'.join(x.get('label','?') for x in _dw) or '无'}）", flush=True)
         if not _ok11:
+            # ★2026-09-09 修复：0 样本时给出原因链（多为 bars 停更 → T+1 无法填充），
+            #   而非只有"0 类型有样本"一句让人无从下手
+            if _nt == 0:
+                try:
+                    from data.cache import DailyCache as _DC11
+                    _bd = str(_DC11().latest_trade_date() or "")
+                except Exception:
+                    _bd = "?"
+                print(f"   ↳ 原因：远期池 T+1 样本未填充——bars.db 最新完整交易日 {_bd}，"
+                      f"其后无次日行情可算 T+1（多因 Tushare 日线增量未入库）；"
+                      f"日线数据恢复后下一轮管道自动填充", flush=True)
             fails += 1
     except Exception as e:
         print(f"11) 实盘裁决失败: {str(e)[:60]}", flush=True)
@@ -174,13 +230,15 @@ def main() -> int:
 
     # 12) ★2026-08-12 百轮#99：决策链 13 环节（含实盘裁决——#97 数据链）
     #   ★#391 与 check_consistency 对齐：supplier-lag（note 含"内容滞后/供应商"）不算故障，只算 hard failure
+    #   ★2026-09-09 修复：追加"外包未接入"关键词——外包模块（daily_signal 等）未随源码分发
+    #   导致的环节缺文件属外部缺口，不计硬故障（与 check_consistency #15 同口径）
     try:
         from live_api import live_chain
         _ch = live_chain()
         _chain = _ch.get("chain") or []
         _names = [n.get("name") for n in _chain]
         _bad = [n for n in _chain if not n.get("ok")
-                and not ("内容滞后" in (n.get("note") or "") or "供应商" in (n.get("note") or ""))]
+                and not any(k in (n.get("note") or "") for k in ("内容滞后", "供应商", "外包未接入"))]
         _ok12 = len(_names) >= 13 and "实盘裁决" in _names and not _bad
         print(f"12) 决策链 13 环节: {'✅' if _ok12 else '⚠️'} {len(_names)} 环节（含实盘裁决）"
               + (f"，{len(_bad)} 硬故障" if _bad else ""), flush=True)

@@ -37,7 +37,14 @@ def _pro():
     if _PRO is None:
         import tushare as ts
         cfg = _load_cfg()
-        p = ts.pro_api(cfg["tushare_token"])
+        _tok = cfg.get("tushare_token")
+        if not _tok:
+            # ★2026-09-09 修复：token 未配置时报明确可操作错误，而非 tushare 库原始
+            #   "请设置tushare pro的token凭证码"（不含配置路径，用户无从下手）
+            raise RuntimeError(
+                "tushare_token 未配置：请在 config/params.yaml 的 data.tushare_token 填入 "
+                "Tushare Pro token（https://tushare.pro 注册获取），并可按需配置 data.tushare_api_url")
+        p = ts.pro_api(_tok)
         p._DataApi__http_url = cfg.get("tushare_api_url", "https://api.tushare.pro")
         try:
             p._DataApi__timeout = 10

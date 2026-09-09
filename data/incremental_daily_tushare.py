@@ -236,6 +236,7 @@ def main():
 
     # 幂等：bars 已覆盖该日 → 跳过（★#143 双库合并探测——主库写保护后增量库含新数据）
     # ★2026-08-12 协同修复：MAX(date) 只有 183 只占位也判"已有" → 加覆盖率门槛（<4000 只视为残缺需重拉）
+    has = None
     try:
         con = sqlite3.connect(f"file:{BARS_DB}?mode=ro&immutable=1", uri=True, timeout=3)
         cur = con.execute("SELECT MAX(date) FROM daily_bar WHERE adjust='qfq'").fetchone()
@@ -259,16 +260,43 @@ def main():
         print(f"[tushare] {date} 已在库（最新 {has}）→ 跳过")
         return 0
 
+    # ★2026-09-09 缺口回填：token 停配期间累积的中间交易日（如 09-07/08）一并补拉——
+    #   原实现只拉服务器最新一天，bars 会 09-04 → 09-09 跳空（中间缺口影响 fwd/均线）。
+    #   用 trade_cal 枚举 bars 最新与服务器最新之间的开市日；>15 天缺口只回填最近 15 天并提示
+    #   （首次接入的历史大缺口走 backfill_hist_bars.py，不拖垮每日链）。
+    dates = [date]
+    try:
+        if has and str(has) < f"{date[:4]}-{date[4:6]}-{date[6:]}":
+            _cal = _call(pro.trade_cal, exchange="SSE", start_date=str(has).replace("-", ""),
+                         end_date=date, is_open="1")
+            if _cal is not None and not _cal.empty:
+                _lo = str(has)[:10]
+                _hi = f"{date[:4]}-{date[4:6]}-{date[6:]}"
+                # ★保持 8 位 YYYYMMDD（fetch_day/pro.daily 接口格式，勿转横杠）
+                _miss = sorted(d for d in _cal["cal_date"].astype(str).tolist()
+                               if _lo < f"{d[:4]}-{d[4:6]}-{d[6:]}" <= _hi)
+                if _miss:
+                    dates = _miss
+                    print(f"[tushare] 缺口回填 {len(dates)} 个交易日：{dates[0]} ~ {dates[-1]}")
+    except Exception:
+        pass
+    if len(dates) > 15:
+        print(f"[tushare] 缺口 {len(dates)} 天 >15 → 只回填最近 15 天（历史大缺口请用 backfill 工具）")
+        dates = dates[-15:]
     t0 = time.time()
-    df = fetch_day(pro, date)
-    if df is None or df.empty:
-        print(f"[tushare] {date} 服务器无数据（盘后未出）→ 跳过")
-        return 0
-    n = cache.put_daily_batch(df, adjust="qfq", source="tushare")
-    el = time.time() - t0
-    print(f"[tushare] ✅ {date} 全市场 {len(df)} 只已入库（{n} 行，{el:.1f}s）→ bars 最新 {date}")
-    if args.basic:
-        fetch_basic_snapshot(pro, date)
+    n_ok = 0
+    for d in dates:
+        df = fetch_day(pro, d)
+        if df is None or df.empty:
+            print(f"[tushare] {d} 服务器无数据（盘后未出）→ 跳过")
+            continue
+        n = cache.put_daily_batch(df, adjust="qfq", source="tushare")
+        el = time.time() - t0
+        print(f"[tushare] ✅ {d} 全市场 {len(df)} 只已入库（{n} 行，{el:.1f}s）")
+        n_ok += 1
+    print(f"[tushare] 回填完成 {n_ok}/{len(dates)} 天 → bars 最新 {dates[-1] if dates else date}")
+    if args.basic and n_ok:
+        fetch_basic_snapshot(pro, dates[-1])
     return 0
 
 

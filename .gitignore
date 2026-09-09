@@ -23,6 +23,8 @@ harness/home/quantapi*.json
 data/cache/
 data/factorpool/
 data/trash/
+data_m_dir/
+data/minute/
 *.db
 *.sqlite
 *.parquet

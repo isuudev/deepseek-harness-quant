@@ -74,9 +74,14 @@ def run_step(name, cmd, timeout=3600):
     try:
         r = subprocess.run(cmd, capture_output=True, text=True,
                            timeout=timeout, encoding="utf-8", errors="replace")
+        # ★2026-09-09 修复：原实现无论 returncode 一律打 ✓——子进程静默崩溃（traceback 进 stderr）
+        #   也被显示成"完成"，掩盖真实失败（竞价强度信号 1s 空输出即此坑）。
+        #   现按 returncode 区分 ✓/✗；stdout 为空时回退显示 stderr 尾部，失败原因不再隐身。
         out = (r.stdout or "").strip().splitlines()
-        tail = out[-3:] if out else []
-        log(f"  ✓ {name} 完成 ({time.time()-t0:.0f}s)" + (f" | {' | '.join(tail)}" if tail else ""))
+        tail = out[-3:] if out else [x for x in (r.stderr or "").strip().splitlines()][-3:]
+        mark = "✓" if r.returncode == 0 else "✗"
+        log(f"  {mark} {name} {'完成' if r.returncode == 0 else f'失败(exit={r.returncode})'} ({time.time()-t0:.0f}s)"
+            + (f" | {' | '.join(tail)}" if tail else ""))
         return r.returncode == 0
     except subprocess.TimeoutExpired:
         log(f"  ✗ {name} 超时")
@@ -130,27 +135,61 @@ def main():
     log("=== 每日数据管道启动 ===")
     # 1) 分钟 7z 增量 → parquet（★2026-08-09 切换：minute.db 被系统锁 → 走 parquet 绕行方案，
     #    convert_7z_to_parquet.py 输出到 incr_parquet/，minute_reader fallback 读取；旧 ingest_minute_7z 保留待锁释放）
-    run_step("分钟 7z 增量 → parquet", [PY, str(BASE / "data" / "convert_7z_to_parquet.py")], timeout=7200)
+    #    ★2026-09-09 修复：目录不存在（7z 未下载/LWQUANT_MINUTE_DIR 未配置）时前置跳过——
+    #    原实现照跑 convert 脚本，脚本打"目录不存在"但 exit 0，管道误报 ✓ 完成。
+    _minute_ok = False
+    _minute_dir = Path(args.minute_dir) if args.minute_dir else None
+    if _minute_dir and _minute_dir.exists():
+        _minute_ok = True
+    else:
+        _root = minute_download_root()
+        _cand = []
+        if _root.exists():
+            for _p in _root.glob("*日更新*"):
+                if _p.is_dir():
+                    for _s in list(_p.glob("*/每日数据")) + list(_p.glob("每日数据")):
+                        if _s.is_dir() and list(_s.glob("*.7z")):
+                            _cand.append(_s)
+        _minute_ok = bool(_cand)
+    if _minute_ok:
+        run_step("分钟 7z 增量 → parquet", [PY, str(BASE / "data" / "convert_7z_to_parquet.py")], timeout=7200)
+    else:
+        log(f"  ⚠ 分钟 7z 增量跳过（目录不存在: {args.minute_dir}）→ "
+            f"请把当日 7z 增量放到 data_m_dir/【2】2026单年A股分钟日频-持续更新到年底/…/每日数据 "
+            f"（或配置 LWQUANT_MINUTE_DIR）；日线链路不受影响")
     # 2) 日线增量 ★2026-08-10 双通道：Tushare 主服务器优先（按日全市场 0.8s，quantdata888 实测可用），
     #    baostock 半挂起（单只 40s）降级为兜底；Tushare 盘后数据未出（17:00 前）时自动跳过不卡链
+    #    ★2026-09-09 修复：token 未配置时前置跳过并给出明确指引——
+    #    原实现照跑 tushare 库，报"请设置tushare pro的token凭证码"原始错误且误导后续环节。
+    _tushare_ok = False
+    _tushare_tok = None
     try:
-        # ★2026-08-14 超时 120→300s：incremental_daily_tushare 含 trade_cal+daily+adj_factor×2+daily_basic
-        #   多次全市场调用 + 代理服务器 间歇超时重试，120s 常超 → 误走 baostock 慢兜底（几小时）
-        _rt = subprocess.run(
-            [PY, "-X", "utf8", str(BASE / "data" / "incremental_daily_tushare.py")],
-            capture_output=True, text=True, timeout=300, encoding="utf-8", errors="replace")
-        _tushare_ok = _rt.returncode == 0 and ("已入库" in (_rt.stdout or ""))
-        log(f"日线增量(Tushare): {(_rt.stdout or '').strip().splitlines()[-1] if (_rt.stdout or '').strip() else '无输出'}")
-    except subprocess.TimeoutExpired:
-        _tushare_ok = False
-        log("  ⚠ Tushare 日线增量超时")
+        from data.config import load_params as _load_params
+        _tushare_tok = (_load_params().get("data") or {}).get("tushare_token")
     except Exception:
-        _tushare_ok = False
-    if not _tushare_ok:
-        # ★2026-08-14 移除 baostock 全市场兜底（原 timeout=7200 几小时，Tushare 偶发失败就卡住整链）
-        #   → 失败即跳过，数据保持 bars.db 现有；17:30 TushareInc / 次日链会自动重试。
-        #   baostock 仍用于历史补拉（backfill_hist_bars.py 独立任务），不在此处做每日兜底。
-        log("  ⚠ Tushare 日线增量失败（已重试）→ 跳过当日增量（数据保持 bars.db 现有；17:30/次日链自动重试）")
+        pass
+    if _tushare_tok:
+        try:
+            # ★2026-08-14 超时 120→300s：incremental_daily_tushare 含 trade_cal+daily+adj_factor×2+daily_basic
+            #   多次全市场调用 + 代理服务器 间歇超时重试，120s 常超 → 误走 baostock 慢兜底（几小时）
+            _rt = subprocess.run(
+                [PY, "-X", "utf8", str(BASE / "data" / "incremental_daily_tushare.py")],
+                capture_output=True, text=True, timeout=300, encoding="utf-8", errors="replace")
+            _tushare_ok = _rt.returncode == 0 and ("已入库" in (_rt.stdout or ""))
+            log(f"日线增量(Tushare): {(_rt.stdout or '').strip().splitlines()[-1] if (_rt.stdout or '').strip() else '无输出'}")
+        except subprocess.TimeoutExpired:
+            _tushare_ok = False
+            log("  ⚠ Tushare 日线增量超时")
+        except Exception:
+            _tushare_ok = False
+        if not _tushare_ok:
+            # ★2026-08-14 移除 baostock 全市场兜底（原 timeout=7200 几小时，Tushare 偶发失败就卡住整链）
+            #   → 失败即跳过，数据保持 bars.db 现有；17:30 TushareInc / 次日链会自动重试。
+            #   baostock 仍用于历史补拉（backfill_hist_bars.py 独立任务），不在此处做每日兜底。
+            log("  ⚠ Tushare 日线增量失败（已重试）→ 跳过当日增量（数据保持 bars.db 现有；17:30/次日链自动重试）")
+    else:
+        log("  ⚠ Tushare 日线增量跳过：未配置 tushare_token（config/params.yaml → data.tushare_token）→ "
+            "bars.db 保持现有日期；补配 token 后本步骤自动恢复")
     # 2.5) ★2026-08-14 沪深300 指数刷新（baostock 单指数，秒级）——保证红绿灯数据实时性（收盘后拿到当日指数）
     run_step("沪深300指数刷新", [PY, "-X", "utf8", str(BASE / "data" / "fetch_index_daily.py")], timeout=120)
     # 2.6) ★2026-08-14 择时红绿灯（均线金叉6/12，依赖 bars.db 沪深300 日线，纯本地毫秒级）
@@ -159,14 +198,17 @@ def main():
     #     17:30 scheduler 若因 bars 未到当日而跳过，18:30 日线拉完后此处补跑；
     #     scheduler 幂等（latest<=done 自动跳过），bars 未更新时无副作用。
     #     放在扫描之前 → scan 的 ext_signal 能消费当日评分
-    _sched = Path(r"data/factorpool/core/scheduler.py")
+    #     ★2026-09-09 修复：原相对路径 data/factorpool/... 依赖 CWD（GUI 控制台与计划任务 CWD 不同即误判）；
+    #     改 BASE 绝对路径；外包池未随源码分发 → 不存在时跳过（不视为故障，本地三件套已由市场三件套生成器兜底）
+    _sched = BASE / "data" / "factorpool" / "core" / "scheduler.py"
     if _sched.exists():
         # ★2026-08-11 超时 1800→2700s：scheduler 全量补跑（60 因子全流程）可能 >30 分钟
         #   （08-10 事故中修复脚本单日截面重算即 18 分钟）；幂等跳过时几秒返回，无副作用
         run_step("因子池评分补跑（C5 保底）",
                  [PY, "-X", "utf8", str(_sched), "daily"], timeout=2700)
     else:
-        log("  ⚠ 外包因子池 scheduler 不存在（路径变更？）→ 跳过补跑")
+        log("  ⚠ 外包因子池 scheduler 未接入（data/factorpool/core/scheduler.py 不存在，外包池未随源码分发）→ 跳过补跑；"
+            "个股因子评分由 scan 本地口径兜底")
     # 2.8) ★外包市场三件套（状态栏 温度/宽度/拥挤度）——外包池未随源码分发，2026-09 起由
     #     本地重构生成器从 bars.db 实算（data/factorpool/market_products.py，幂等同日覆盖）；
     #     ticker 60s 轮询 /api/live/timing_dash，产物落盘即亮起，无需重启服务
@@ -185,8 +227,19 @@ def main():
     _now = _dt.now()
     _start = (_now - _td(days=95)).strftime("%Y-%m")
     _end = _now.strftime("%Y-%m")
-    run_step("竞价强度信号", [PY, str(BASE / "factors" / "opportunities" / "auction_strength.py"),
-                              "--start", _start, "--end", _end], timeout=1800)
+    # ★2026-09-09 修复：分钟数据源缺失（incr_parquet 无数据且 1m_price_zip 无 zip）时前置跳过——
+    #   原实现子进程 1s 内 FileNotFoundError traceback（stderr 被吞），管道误报 ✓ 完成且无产物，
+    #   决策链"竞价信号"环节因此长期缺文件。1m_price_zip 根目录统一走 minute_download_root()。
+    _incr_pq = BASE / "data" / "minute" / "incr_parquet"
+    _zip_dir = minute_download_root() / "1m_price_zip"
+    _has_minute = (_incr_pq.exists() and any(_incr_pq.glob("*.parquet"))) or \
+                  (_zip_dir.exists() and any(_zip_dir.glob("*.zip")))
+    if _has_minute:
+        run_step("竞价强度信号", [PY, str(BASE / "factors" / "opportunities" / "auction_strength.py"),
+                                  "--start", _start, "--end", _end], timeout=1800)
+    else:
+        log(f"  ⚠ 竞价强度信号跳过（分钟数据源缺失：{_incr_pq} 与 {_zip_dir} 均无数据 → "
+            "供应商 1 分钟数据未交付；分钟数据放入 data_m_dir 后自动恢复）")
     # 4) 机会扫描 + Pitch（非必需步骤，可跳过）
     if not args.skip_scan:
         run_step("机会扫描 --pitch", [PY, str(BASE / "factors" / "opportunities" / "scan.py"), "--pitch"], timeout=1800)
@@ -219,7 +272,15 @@ def main():
     #   pool_layers/daily_signal/远期池/突破监控 不在 17:30 管道链 → 页面停留旧数据 08-10）
     run_step("三层池（观察/候选/决策）", [PY, "-X", "utf8", str(BASE / "strategy" / "pool_layers.py"),
               "--n", "100", "--capital", "200000", "--regime-cash", "0.3"], timeout=1800)
-    run_step("今日信号（择时/审计）", [PY, "-X", "utf8", str(BASE / "report" / "daily_signal.py")], timeout=1800)
+    # ★2026-09-09 修复：report/daily_signal.py 为外包包（main.py 注明"未随源码分发"）——
+    #   原实现无条件调用，子进程"can't open file" 0s 失败且旧 run_step 误报 ✓，
+    #   决策链"今日信号"环节因此长期缺文件。现改为存在才跑、缺失明确跳过。
+    _ds = BASE / "report" / "daily_signal.py"
+    if _ds.exists():
+        run_step("今日信号（择时/审计）", [PY, "-X", "utf8", str(_ds)], timeout=1800)
+    else:
+        log("  ⚠ 今日信号跳过（report/daily_signal.py 外包包未随源码分发）→ "
+            "今日信号/决策链该环节保持缺失；本地等价产物见 output/daily_signal_*.json（外包接入后自动恢复）")
     run_step("新择时系统（适合买入判断）", [PY, "-X", "utf8", str(BASE / "factors" / "policy" / "timing_system.py")], timeout=300)
     run_step("组合风控（集中度/行业上限）", [PY, "-X", "utf8", str(BASE / "risk" / "position_monitor.py")], timeout=300)   # ★2026-08-11 百轮#11
     run_step("远期池 T+1 填充", [PY, "-X", "utf8", str(BASE / "factors" / "opportunities" / "pitch_track.py")], timeout=1800)

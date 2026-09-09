@@ -24,9 +24,32 @@ _CACHE_SEC = 300
 _CIRCUIT = {"fail": 0, "open": False}   # ★熔断：接口连续 3 次失败 → 本进程停用（夜间限流防拖慢）
 
 
+def _token_ok() -> bool:
+    """★2026-09-09 修复：Tushare token 未配置时前置禁用资金验证——
+    原实现每只候选空烧 3 次接口再触发熔断（每次 ~10s 超时重试 ×5），
+    管道日志出现"接口连续 3 次失败 → 熔断停用"的吓人告警，实际只是没配 token。
+    现改为一次性明确提示，不请求、不熔断。"""
+    if not getattr(_token_ok, "_checked", False):
+        _token_ok._checked = True
+        try:
+            from data.config import load_params
+            _t = (load_params().get("data") or {}).get("tushare_token")
+            _token_ok._val = bool(_t)
+            if not _t:
+                _CIRCUIT["open"] = True
+                print("  [资金验证] 跳过（tushare_token 未配置 → 资金流/龙虎榜/筹码接口不可用，"
+                      "突破候选标记 UNKNOWN；补配 token 后自动恢复）")
+        except Exception:
+            _token_ok._val = False
+            _CIRCUIT["open"] = True
+    return getattr(_token_ok, "_val", False)
+
+
 def _load(fetcher_fn, key: str, **kw):
     """带缓存、熔断与降级的接口调用；失败 → None"""
     if _CIRCUIT["open"]:
+        return None
+    if not _token_ok():
         return None
     now = time.time()
     c = _cache[key]

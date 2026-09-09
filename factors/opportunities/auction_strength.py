@@ -35,7 +35,14 @@ sys.path.insert(0, str(BASE))
 import numpy as np
 import pandas as pd
 
-MINUTE_DIR = Path(r"data/minute/download/1m_price_zip")
+# ★2026-09-09 修复：分钟数据根目录统一走 minute_download_root()
+#   （LWQUANT_MINUTE_DIR > data_m_dir > data/minute/download）——
+#   原硬编码 data/minute/download/1m_price_zip 在本机数据放 data_m_dir 时永远找不到。
+try:
+    from data.cache import minute_download_root as _mdr
+    MINUTE_DIR = _mdr() / "1m_price_zip"
+except Exception:
+    MINUTE_DIR = Path(r"data/minute/download/1m_price_zip")
 OUT = BASE / "logs" / "auction_signal.json"
 ROLL_DAYS = 20          # 量能滚动窗口
 SIGNAL_WINDOW = 5       # 开盘承接窗口（分钟数）
@@ -44,6 +51,8 @@ SIGNAL_WINDOW = 5       # 开盘承接窗口（分钟数）
 def list_days(year: int) -> list:
     """当年可用交易日：incr_parquet（7z 增量，2026 最新）∪ zip 内全部
     ★2026-08-10：7z 增量转的 incr_parquet 优先（zip 可能不含最新交易日）
+    ★2026-09-09 修复：分钟数据源缺失时返回空列表（原 ZipFile 直接抛 FileNotFoundError →
+      子进程 1s 内 traceback 静默崩溃，管道日志看不到原因）
     """
     days = set()
     incr_dir = Path(r"data/minute/incr_parquet")
@@ -51,8 +60,10 @@ def list_days(year: int) -> list:
         for p in incr_dir.glob("*.parquet"):
             if p.stem.startswith(str(year)):
                 days.add(p.stem)
-    z = zipfile.ZipFile(MINUTE_DIR / f"{year}.zip")
-    days.update(n.replace(".parquet", "") for n in z.namelist() if n.endswith(".parquet"))
+    zip_p = MINUTE_DIR / f"{year}.zip"
+    if zip_p.exists():
+        z = zipfile.ZipFile(zip_p)
+        days.update(n.replace(".parquet", "") for n in z.namelist() if n.endswith(".parquet"))
     return sorted(days)
 
 
@@ -78,7 +89,12 @@ def read_day(year: int, date8: str) -> pd.DataFrame:
             first_mask = df.groupby("code").cumcount() == 0
             df.loc[first_mask, "pre_close"] = df.loc[first_mask, "open"]
         return df
-    z = zipfile.ZipFile(MINUTE_DIR / f"{year}.zip")
+    zip_p = MINUTE_DIR / f"{year}.zip"
+    if not zip_p.exists():
+        # ★2026-09-09 修复：明确报"分钟数据源缺失"而非裸 FileNotFoundError traceback
+        raise FileNotFoundError(
+            f"分钟数据源缺失：{incr} 与 {zip_p} 均不存在（请先下载当日 7z 增量或配置 LWQUANT_MINUTE_DIR）")
+    z = zipfile.ZipFile(zip_p)
     df = pd.read_parquet(io.BytesIO(z.read(f"{date8}.parquet")))
     return df
 
@@ -100,7 +116,10 @@ def compute_signals(start: str, end: str) -> dict:
                (y < ye or (y == ye and d[4:6] <= f"{me:02d}"))
     target = [(y, d) for y, d in all_days if within(y, d)]
     if not target:
-        return {"error": "日期范围内无交易日"}
+        # ★2026-09-09 修复：区分"无交易日"与"分钟数据源缺失"——后者给出可操作指引
+        return {"error": "日期范围内无分钟数据（data/minute/incr_parquet 与 "
+                         "data/minute/download/1m_price_zip 均无 {start}~{end} 数据；"
+                         "请先下载当日 7z 增量或配置 LWQUANT_MINUTE_DIR）"}
     # rolling 缓存：code -> v30 序列 + first5 序列（仅保留 ROLL_DAYS 窗口）
     v30_hist, f5_hist = {}, {}
     out = {}

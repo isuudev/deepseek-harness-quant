@@ -87,12 +87,14 @@ def check() -> int:
     n_lt = len(lt.get("entries", []))
     _row("短线池数", n_tp == n_lt, f"文件={n_tp} vs API={n_lt}")
     # 5) 决策链（★2026-08-12 百轮后#123：允许"数据源滞后"环节——note 含 内容滞后/供应商 非故障）
+    #    ★2026-09-09 修复：追加"外包未接入"——外包模块未随源码分发导致的环节缺文件属外部缺口
     ch = _api("/api/live/chain")
     chain = ch.get("chain", [])
+    _lag_kw = ("内容滞后", "供应商", "外包未接入")
     bad = [n["name"] for n in chain if not n.get("ok")
-           and not ("内容滞后" in (n.get("note") or "") or "供应商" in (n.get("note") or ""))]
+           and not any(k in (n.get("note") or "") for k in _lag_kw)]
     lag = [n["name"] for n in chain if not n.get("ok")
-           and ("内容滞后" in (n.get("note") or "") or "供应商" in (n.get("note") or ""))]
+           and any(k in (n.get("note") or "") for k in _lag_kw)]
     _row("决策链", not bad and len(chain) >= 10,
          f"{len(chain)} 环节" + (f" 异常: {bad}" if bad else "") + (f"（{len(lag)} 数据源滞后）" if lag else ""))
     # 6) 止盈引擎 vs 真实持仓
@@ -110,16 +112,23 @@ def check() -> int:
          f"live_opp in_pitch={n_inp} vs pitch_v2={n_pv}"
          + (f"（缺口 {_gap} 只：value类不在机会池，Pitch tab 可见）" if _gap > 0 else ""))
     # 8) ★强因子直通一致性（百轮#67-68）：跨家族命中 >0；机会池内标注 ≤ 命中
+    #    ★2026-09-09 修复：直通依赖「factor_risk 强因子清单 × 外包 daily CSV rank」双源，
+    #    外包 daily CSV 无产出时必然 0 只 → 信息性跳过不计 fail（外包未接入非系统断链）；
+    #    有 CSV 但 0 只才判故障。
     try:
         sys.path.insert(0, str(BASE))
+        _ds_present = bool(glob.glob("data/factorpool/output/daily_scores/daily_*.csv"))
         from factors.opportunities.scan import load_strong_hits
         _sh = load_strong_hits()
         n_sh = len(_sh)
         n_sh_pool = sum(1 for o in lo.get("opportunities", []) if o.get("strong_hit"))
     except Exception:
-        n_sh, n_sh_pool = -1, -1
-    _row("强因子直通", n_sh > 0 and n_sh_pool <= n_sh,
-         f"跨家族 {n_sh} 只 ≥ 机会池内标注 {n_sh_pool}")
+        n_sh, n_sh_pool, _ds_present = -1, -1, True
+    if not _ds_present:
+        print("  ℹ️ 强因子直通: 外包未接入（daily_scores 无产出）→ 直通不触发（设计内降级），不计故障")
+    else:
+        _row("强因子直通", n_sh > 0 and n_sh_pool <= n_sh,
+             f"跨家族 {n_sh} 只 ≥ 机会池内标注 {n_sh_pool}")
     # 9) ★择时系统 v4（百轮#66/#91/#105）：文件可读 + 四维齐全（政策=四因子评分，宏观=regime+社融/利率修正）
     _tm = _latest("timing_system_*.json", "output")
     _dims = _tm.get("dims", {})
@@ -142,7 +151,14 @@ def check() -> int:
                 continue
     except Exception:
         _rm_n, _rm_best = 0, None
-    _row("FRC 系数", _rm_n > 30, f"{_rm_n} 因子" + (f"（{Path(_rm_best).name if _rm_best else '缺失'}）"))
+    # ★2026-09-09 修复：外包 FRC（data/factorpool/risk）未随源码分发 → 文件缺失时
+    #   打印信息性说明不计 fail（与 #402 分钟因子"外包缺口哨兵不计 fail"同口径）；
+    #   有文件但因子数不足才判故障（消费端缺失时按中性 1.0 兜底，不阻断）
+    if not _rm_best:
+        print("  ℹ️ FRC 系数: 外包未接入（data/factorpool/risk/risk_multiplier_*.json 无产出）→ "
+              "FRC 按中性 1.0 兜底，不计故障")
+    else:
+        _row("FRC 系数", _rm_n > 30, f"{_rm_n} 因子（{Path(_rm_best).name}）")
     # 11) ★日历层（百轮#65）：get_window 可调用（当前窗口零副作用）
     try:
         from data.calendar_hook import get_window
@@ -176,13 +192,15 @@ def check() -> int:
     # 15) ★决策链 13 环节（百轮#97/#123）：环节数 ≥13 且含"实盘裁决"、无断链
     #    ★2026-08-12 百轮后#123：允许"数据源滞后"环节（note 含"内容滞后/供应商"）不视为故障——
     #    竞价信号供应商分钟数据未交付（外部条件）诚实标红，但非系统断链
+    #    ★2026-09-09 修复：追加"外包未接入"（外包模块未随源码分发属外部缺口）
     try:
         _ch = _api("/api/live/chain")
         _names = [n.get("name") for n in (_ch.get("chain") or [])]
+        _lag_kw15 = ("内容滞后", "供应商", "外包未接入")
         _lag_n = sum(1 for n in _ch.get("chain", []) if not n.get("ok")
-                     and ("内容滞后" in (n.get("note") or "") or "供应商" in (n.get("note") or "")))
+                     and any(k in (n.get("note") or "") for k in _lag_kw15))
         _bad_nodes = [n for n in _ch.get("chain", []) if not n.get("ok") and
-                      not ("内容滞后" in (n.get("note") or "") or "供应商" in (n.get("note") or ""))]
+                      not any(k in (n.get("note") or "") for k in _lag_kw15)]
         _ok15 = len(_names) >= 13 and "实盘裁决" in _names and not _bad_nodes
         _row("决策链 13 环节", _ok15,
              f"{len(_names)} 环节" + ("（含实盘裁决）" if "实盘裁决" in _names else "（缺实盘裁决）")

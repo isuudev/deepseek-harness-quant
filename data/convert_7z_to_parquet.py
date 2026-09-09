@@ -145,8 +145,10 @@ def main():
     args = ap.parse_args()
 
     # ★2026-08-10 自动发现最新更新目录（用户每日数据更新生成新目录）
-    _ROOT = Path(r"data/minute/download/【2】2026单年A股分钟日频-持续更新到年底")
-    _DEFAULT_DIR = Path(r"data/minute/download/【2】2026单年A股分钟日频-持续更新到年底/8.9日更新/2026(1)/每日数据")
+    # ★2026-09-09 修复：根目录统一走 minute_download_root()（LWQUANT_MINUTE_DIR > data_m_dir > data/minute/download）
+    from data.cache import minute_download_root as _mdr
+    _ROOT = _mdr() / "【2】2026单年A股分钟日频-持续更新到年底"
+    _DEFAULT_DIR = _ROOT / "8.9日更新" / "2026(1)" / "每日数据"
     if _ROOT.exists():
         cands = []
         for p in _ROOT.glob("*日更新*"):
@@ -163,8 +165,10 @@ def main():
     else:
         d = Path(args.dir) if args.dir else DEFAULT_DIR
         if not d.exists():
-            log(f"目录不存在: {d}")
-            return
+            # ★2026-09-09 修复：目录缺失明确报错并返回非零（原 return None → exit 0，
+            #   管道误报"✓ 完成"；现由 daily_pipeline 前置跳过 + 此处兜底双保险）
+            log(f"目录不存在: {d}（请用 --dir 指定当日 7z 目录或配置 LWQUANT_MINUTE_DIR）")
+            sys.exit(2)
         paths = sorted(d.glob("*.7z"))
 
     # 已完成检查

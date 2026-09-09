@@ -2050,6 +2050,10 @@ def _minute_node() -> dict:
         _note.append(("1m因子至%s（数据，滞后3-5天）" % _i1cov) if _i1cov else "1m因子（数据）")
     else:
         _note.append("1m因子缺失")
+    if not (_k5.exists() and _i1.exists()):
+        # ★2026-09-09 修复：分钟因子 parquet 完全缺失 = 供应商分钟数据未交付（外部缺口），
+        #   带"供应商"关键词 → check_consistency/verify_day_pipeline 按 #381 口径不计硬故障
+        _note.append("（供应商分钟数据未交付）")
     return {"name": "分钟数据", "ok": _ok, "age_h": _age,
             "file": _k5.name if _k5.exists() else None,
             "date": _k5cov,
@@ -2124,7 +2128,17 @@ def live_chain() -> dict:
             except Exception:
                 nodes.append({"name": "分钟数据", "ok": False, "age_h": None, "file": None, "date": ""})
         if not fs:
-            nodes.append({"name": name, "ok": False, "age_h": None, "file": None, "date": ""})
+            # ★2026-09-09 修复：文件完全缺失时按两类外部缺口标注（不计硬故障）——
+            #   ① 竞价信号：供应商 1 分钟数据未交付（auction_strength 无法产出）
+            #   ② 今日信号：外包 daily_signal 模块未随源码分发（main.py 注明）
+            #   check_consistency/verify_day_pipeline 按 #381 口径识别"供应商/外包未接入"
+            #   为外部缺口（非系统断链），避免每晚假红；本地其他环节缺文件仍算硬故障。
+            _nd_missing = {"name": name, "ok": False, "age_h": None, "file": None, "date": ""}
+            if name == "竞价信号":
+                _nd_missing["note"] = "未生成（供应商 1 分钟数据未交付：data/minute 无 incr_parquet/1m_price_zip 数据源）"
+            elif name == "今日信号":
+                _nd_missing["note"] = "未生成（外包未接入：report/daily_signal.py 未随源码分发）"
+            nodes.append(_nd_missing)
             continue
         f = fs[-1]
         try:

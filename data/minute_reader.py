@@ -19,7 +19,17 @@ from pathlib import Path
 
 import pandas as pd
 
-BASE = Path(r"data/minute/download")
+# ★2026-09-09 修复：统一走 minute_download_root()（LWQUANT_MINUTE_DIR > data_m_dir > data/minute/download），
+#   本机分钟数据放 data_m_dir 时原硬编码 data/minute/download 永远找不到。
+def _minute_base() -> Path:
+    try:
+        from data.cache import minute_download_root
+        return minute_download_root()
+    except Exception:
+        return Path(r"data/minute/download")
+
+
+BASE = _minute_base()
 
 
 def _zip_path(freq: str, year: str) -> Path:

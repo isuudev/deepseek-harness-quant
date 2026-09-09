@@ -424,17 +424,27 @@ def run_update():
     except Exception as e:
         log(f"因子池巡检失败: {e}")
     # 3) 每日信号（v3 口径）+ 看板（数据驱动版）
+    #    ★2026-09-09 修复：report/daily_signal.py、dashboard.py 为外包包未随源码分发（main.py 注明）——
+    #    缺失时明确记录跳过，不再无意义地跑 "can't open file" 0s 失败。
     try:
         import subprocess
-        r = subprocess.run(
-            [sys.executable, "-X", "utf8", str(BASE / "report" / "daily_signal.py")],
-            capture_output=True, text=True, timeout=600, encoding="utf-8", errors="replace")
-        out = (r.stdout or "")[-800:]
-        log(f"每日信号(v3): exit={r.returncode} {out.strip()[:200]}")
-        r2 = subprocess.run(
-            [sys.executable, "-X", "utf8", str(BASE / "report" / "dashboard.py")],
-            capture_output=True, text=True, timeout=300, encoding="utf-8", errors="replace")
-        log(f"看板更新: exit={r2.returncode} {((r2.stdout or '')[-200:]).strip()}")
+        _ds_path = BASE / "report" / "daily_signal.py"
+        if _ds_path.exists():
+            r = subprocess.run(
+                [sys.executable, "-X", "utf8", str(_ds_path)],
+                capture_output=True, text=True, timeout=600, encoding="utf-8", errors="replace")
+            out = (r.stdout or "")[-800:]
+            log(f"每日信号(v3): exit={r.returncode} {out.strip()[:200]}")
+        else:
+            log("每日信号(v3): 跳过（report/daily_signal.py 外包包未随源码分发）")
+        _dash_path = BASE / "report" / "dashboard.py"
+        if _dash_path.exists():
+            r2 = subprocess.run(
+                [sys.executable, "-X", "utf8", str(_dash_path)],
+                capture_output=True, text=True, timeout=300, encoding="utf-8", errors="replace")
+            log(f"看板更新: exit={r2.returncode} {((r2.stdout or '')[-200:]).strip()}")
+        else:
+            log("看板更新: 跳过（report/dashboard.py 外包包未随源码分发）")
     except Exception as e:
         log(f"每日信号/看板失败: {e}")
     # 4) Tushare 精确版历史市值增量（--one：每轮尝试拉 1 个月，72 轮 ≈ 12 天补齐 hist_mv_ts，

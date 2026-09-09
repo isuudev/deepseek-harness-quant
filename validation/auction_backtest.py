@@ -29,9 +29,10 @@ sys.path.insert(0, str(BASE))
 
 import numpy as np
 import pandas as pd
-from data.cache import CACHE_DIR
+from data.cache import CACHE_DIR, minute_download_root
 
-MINUTE_DIR = Path(r"data/minute/download/1m_price_zip")
+# ★2026-09-09 修复：与 minute_reader/auction_strength 同源——分钟数据根目录统一走 minute_download_root()
+MINUTE_DIR = minute_download_root() / "1m_price_zip"
 BARS_DB = str(CACHE_DIR / "bars.db")
 SIGNAL_JSON = BASE / "logs" / "auction_signal.json"
 OUT_JSON = BASE / "logs" / "auction_backtest_result.json"

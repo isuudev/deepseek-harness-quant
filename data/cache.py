@@ -333,10 +333,21 @@ def _f(x):
 def minute_download_root() -> Path:
     """分钟数据下载根目录（用户每日 7z 增量数据位置）。
 
-    优先级：环境变量 LWQUANT_MINUTE_DIR > 默认 <repo>/data/minute/download。
+    优先级：环境变量 LWQUANT_MINUTE_DIR > <repo>/data_m_dir（本机私有目录，2026-09-09 起）
+            > <repo>/data/minute/download（历史默认）。
     用于替代散落在各脚本里的 data/minute/download 相对路径/反斜杠硬编码。
     """
     env = os.environ.get("LWQUANT_MINUTE_DIR")
     if env:
         return Path(env)
-    return Path(__file__).resolve().parent.parent / "data" / "minute" / "download"
+    base = Path(__file__).resolve().parent.parent
+    # ★2026-09-09：data_m_dir 为本机私有分钟数据目录（.gitignore 已排除，勿提交 GitHub）。
+    #   仅当目录存在且非空（有实际数据文件/子目录，忽略 .DS_Store 之类）时才优先使用，
+    #   避免空目录抢占导致仍放在 data/minute/download 的其它数据被误判缺失。
+    _m = base / "data_m_dir"
+    try:
+        if _m.is_dir() and any(p.name != ".DS_Store" for p in _m.iterdir()):
+            return _m
+    except OSError:
+        pass
+    return base / "data" / "minute" / "download"

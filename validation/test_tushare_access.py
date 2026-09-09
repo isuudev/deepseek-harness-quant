@@ -34,11 +34,12 @@ def main():
     print("Tushare 主服务器可达性测试（15000 积分版）")
     print("=" * 60)
     import tushare as ts
-    pro = ts.pro_api(os.environ.get("LW_TUSHARE_TOKEN") or
-                     __import__("yaml").safe_load(
-                         open(r"config/params.yaml",
-                              encoding="utf-8"))["data"]["tushare_token"])
-    pro._DataApi__http_url = API_URL
+    # ★2026-09-09 修复：api_url 从 config/params.yaml 读（用户自定义主服务器 t.xiaodefa.top），
+    #   原硬编码 https://api.tushare.pro 会测错服务器
+    import yaml
+    _cfg = yaml.safe_load(open(r"config/params.yaml", encoding="utf-8"))["data"]
+    pro = ts.pro_api(os.environ.get("LW_TUSHARE_TOKEN") or _cfg["tushare_token"])
+    pro._DataApi__http_url = _cfg.get("tushare_api_url", API_URL)
 
     print("\n[1] 基础连通")
     test("trade_cal 交易日历", lambda: pro.trade_cal(exchange="SSE", start_date="20260801", end_date="20260810"))
