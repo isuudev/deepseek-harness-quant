@@ -56,12 +56,12 @@ def main():
     run("三层池",
         [PY, "-X", "utf8", str(BASE / "strategy/pool_layers.py"), "--n", "100", "--capital", "200000", "--regime-cash", "0.3"],
         timeout=1800)
-    # ★2026-09-09 修复：report/daily_signal.py 外包包未随源码分发（main.py 注明）→ 缺失明确跳过
+    # ★2026-09-10 daily_signal 已开源重实现（随源码分发）→ 缺失 = 文件被删，明确跳过并提示
     if (BASE / "report" / "daily_signal.py").exists():
         run("今日信号",
             [PY, "-X", "utf8", str(BASE / "report/daily_signal.py")], timeout=1800)
     else:
-        log("⚠ 今日信号跳过（report/daily_signal.py 外包包未随源码分发）")
+        log("⚠ 今日信号跳过（report/daily_signal.py 缺失，请恢复开源模块文件）")
     log("=== 刷新链完成 ===")
 
 if __name__ == "__main__":

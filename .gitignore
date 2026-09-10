@@ -33,7 +33,12 @@ data/minute/
 # ---- 运行产物 ----
 logs/
 output/
-report/
+report/*
+# ★2026-09-10：report/daily_signal.py 已开源重实现（同源聚合今日信号），随源码分发；
+#   其余看板生成器（dashboard_* 等）仍为外包包，继续排除。
+#   注意：必须用 report/*（而非 report/）——否则父目录整体被忽略，下述例外放行不生效。
+!report/__init__.py
+!report/daily_signal.py
 deck/dashboard_*_20*.html
 deck/*.json
 # ★2026-09-06 R4：历史快照（含行情数据快照，数据边界——不进公开仓库）

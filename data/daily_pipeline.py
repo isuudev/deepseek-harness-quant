@@ -251,15 +251,14 @@ def main():
     #   pool_layers/daily_signal/远期池/突破监控 不在 17:30 管道链 → 页面停留旧数据 08-10）
     run_step("三层池（观察/候选/决策）", [PY, "-X", "utf8", str(BASE / "strategy" / "pool_layers.py"),
               "--n", "100", "--capital", "200000", "--regime-cash", "0.3"], timeout=1800)
-    # ★2026-09-09 修复：report/daily_signal.py 为外包包（main.py 注明"未随源码分发"）——
-    #   原实现无条件调用，子进程"can't open file" 0s 失败且旧 run_step 误报 ✓，
-    #   决策链"今日信号"环节因此长期缺文件。现改为存在才跑、缺失明确跳过。
+    # ★2026-09-09 修复：外包包缺失时跳过；★2026-09-10 daily_signal 已开源重实现
+    #   （report/daily_signal.py 随源码分发）——存在才跑、缺失明确跳过并提示。
     _ds = BASE / "report" / "daily_signal.py"
     if _ds.exists():
         run_step("今日信号（择时/审计）", [PY, "-X", "utf8", str(_ds)], timeout=1800)
     else:
-        log("  ⚠ 今日信号跳过（report/daily_signal.py 外包包未随源码分发）→ "
-            "今日信号/决策链该环节保持缺失；本地等价产物见 output/daily_signal_*.json（外包接入后自动恢复）")
+        log("  ⚠ 今日信号跳过（report/daily_signal.py 缺失——开源模块应随源码分发，请恢复文件）→ "
+            "今日信号/决策链该环节保持缺失；文件恢复后自动恢复")
     run_step("新择时系统（适合买入判断）", [PY, "-X", "utf8", str(BASE / "factors" / "policy" / "timing_system.py")], timeout=300)
     run_step("组合风控（集中度/行业上限）", [PY, "-X", "utf8", str(BASE / "risk" / "position_monitor.py")], timeout=300)   # ★2026-08-11 百轮#11
     run_step("远期池 T+1 填充", [PY, "-X", "utf8", str(BASE / "factors" / "opportunities" / "pitch_track.py")], timeout=1800)

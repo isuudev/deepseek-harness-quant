@@ -258,6 +258,17 @@ data_audit:
     delisted_coverage_min: 95.0    # A3 退市股覆盖率下限(%)
   data_start_note: "<your-config>"
 
+# ---------- 今日信号（report/daily_signal.py 开源替代版，2026-09-10 重设计）----------
+# 定位：L2 决策卡同源聚合（铁律②）——pitch_v2 长线 + tech_pitch 短线 待审批卡 → 今日买入指令；
+#       无 Pitch 时按设计降级：机器决策池（pool_layers decision）→ v3 硬过滤池分层抽样。
+daily_signal:
+  capital: 200000            # 资金规模参照（决定买入清单只数上限，与 pool_layers 分档一致）
+  max_buy_n: 5               # 买入清单只数上限（对齐 risk.max_positions ≤5 纪律）
+  max_hold_n: 20             # hold_plan（策略决策池建议清单）只数上限
+  half_cash: 0.5             # 现金比例 ≥ half_cash → 减仓档（只减不加，不生成买入清单）
+  exit_cash: 1.0             # 现金比例 ≥ exit_cash → 离场档（清仓语义）
+  portfolio_cache: true      # v3 组合按 date 落盘缓存（同日晚间链多轮复用，次日自动失效）
+
 # ---------- 因子池（factors/pool/ 动态因子池，2026-08-07 落地）----------
 # 定位：挖→抓→测→决→报 闭环；时序因子（EPU 等）走 eval_ts，横截面因子走 factor_evaluator
 factor_pool:

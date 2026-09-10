@@ -108,9 +108,12 @@ def hard_filter(cache: DailyCache, date: str, min_mv_yi=None,
         if "is_st" in d.columns and d["is_st"].iloc[-1] in (1, "1", True):
             continue
         # 市值过滤（快照映射，单位亿元；PIT 落地后换 hist_mv 口径）
-        mv = mv_map.get(code)
-        if mv is None or mv < min_mv_yi:
-            continue
+        # ★2026-09-10 修复：min_mv_yi<=0（市值过滤已归 0）时不再要求 mv 数据存在，
+        #   否则 circ_mv_map_full.csv 缺失 → mv=None 全被一票否决 → 硬过滤池恒 0。
+        if min_mv_yi > 0:
+            mv = mv_map.get(code)
+            if mv is None or mv < min_mv_yi:
+                continue
         last = d.iloc[-1]
         # 流动性过滤（近 20 日均成交额）
         if "amount" in d.columns:

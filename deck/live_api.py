@@ -2130,14 +2130,15 @@ def live_chain() -> dict:
         if not fs:
             # ★2026-09-09 修复：文件完全缺失时按两类外部缺口标注（不计硬故障）——
             #   ① 竞价信号：供应商 1 分钟数据未交付（auction_strength 无法产出）
-            #   ② 今日信号：外包 daily_signal 模块未随源码分发（main.py 注明）
+            #   ② 今日信号：★2026-09-10 起 daily_signal 已开源重实现（report/daily_signal.py 随源码
+            #     分发），缺文件 = 晚间链该步未运行/失败，属真实异常（不豁免，供管道定位）。
             #   check_consistency/verify_day_pipeline 按 #381 口径识别"供应商/外包未接入"
             #   为外部缺口（非系统断链），避免每晚假红；本地其他环节缺文件仍算硬故障。
             _nd_missing = {"name": name, "ok": False, "age_h": None, "file": None, "date": ""}
             if name == "竞价信号":
                 _nd_missing["note"] = "未生成（供应商 1 分钟数据未交付：data/minute 无 incr_parquet/1m_price_zip 数据源）"
             elif name == "今日信号":
-                _nd_missing["note"] = "未生成（外包未接入：report/daily_signal.py 未随源码分发）"
+                _nd_missing["note"] = "未生成（report/daily_signal.py 本轮未运行或运行失败，检查 18:30/22:00 链日志）"
             nodes.append(_nd_missing)
             continue
         f = fs[-1]

@@ -424,19 +424,21 @@ def run_update():
     except Exception as e:
         log(f"因子池巡检失败: {e}")
     # 3) 每日信号（v3 口径）+ 看板（数据驱动版）
-    #    ★2026-09-09 修复：report/daily_signal.py、dashboard.py 为外包包未随源码分发（main.py 注明）——
+    #    ★2026-09-10：daily_signal.py 已开源重实现（随源码分发）；dashboard.py 仍为外包包——
     #    缺失时明确记录跳过，不再无意义地跑 "can't open file" 0s 失败。
     try:
         import subprocess
         _ds_path = BASE / "report" / "daily_signal.py"
         if _ds_path.exists():
+            # ★2026-09-10 开源重实现版：首跑全市场硬过滤约 5 分钟（v3_portfolio 按日缓存后
+            #   后续轮秒级）——超时放宽到 1200s，避免首跑被 600s 截断造成「今日信号缺文件」假红
             r = subprocess.run(
                 [sys.executable, "-X", "utf8", str(_ds_path)],
-                capture_output=True, text=True, timeout=600, encoding="utf-8", errors="replace")
+                capture_output=True, text=True, timeout=1200, encoding="utf-8", errors="replace")
             out = (r.stdout or "")[-800:]
             log(f"每日信号(v3): exit={r.returncode} {out.strip()[:200]}")
         else:
-            log("每日信号(v3): 跳过（report/daily_signal.py 外包包未随源码分发）")
+            log("每日信号(v3): 跳过（report/daily_signal.py 缺失——开源模块应随源码分发，请恢复文件）")
         _dash_path = BASE / "report" / "dashboard.py"
         if _dash_path.exists():
             r2 = subprocess.run(

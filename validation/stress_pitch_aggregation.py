@@ -140,6 +140,10 @@ print("\n=== B 组：generate() 降级路径 ===")
 try:
     import risk.data_audit as _da
     class _FakeAuditor:
+        # ★2026-09-10：generate() 调用 DataAuditor(config)，mock 需接受 config 参数，
+        #   否则 object.__init__ 抛 TypeError → gate 误判 FAIL → B 组全挂。
+        def __init__(self, config=None):
+            pass
         def gate(self):
             return True, {"block_reason": ""}
     _da.DataAuditor = _FakeAuditor

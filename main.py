@@ -14,7 +14,8 @@
     python main.py screen --n 15
 
 说明：
-  - report 目录的看板生成器（daily_signal/dashboard_* 等）为外包包，未随源码分发；
+  - report/daily_signal.py（今日信号）已开源重实现（2026-09-10，L2 决策卡同源聚合）；
+    report 目录其余看板生成器（dashboard_* 等）仍为外包包，未随源码分发。
     日常看板请用 `python launcher.py` 启动 Web 决策台（deck :8787）。
   - 三池管理（观察/候选/决策）入口为 strategy/pool_layers.py，可单独调用。
 """
@@ -50,9 +51,9 @@ def main() -> int:
     cmd = sys.argv[1]
     args = sys.argv[2:]
     if cmd == "report":
-        print("[main] report/ 看板生成器为外包包，未随源码分发。")
-        print("[main] 请用 `python launcher.py` 启动 Web 决策台（deck :8787）。")
-        return 0
+        # ★2026-09-10：daily_signal 已开源重实现，report 命令直接生成今日信号；
+        #   其余看板生成器（dashboard_*）仍为外包包。
+        return _run("report/daily_signal.py", args)
     script = COMMANDS.get(cmd)
     if script is None:
         print(f"[main] 未知命令: {cmd}\n{__doc__}")

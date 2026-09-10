@@ -28,6 +28,7 @@ REQUIRED_FILES = [
     "deck/deck_server.py", "deck/system_live.py",
     "factors/factor_engine.py", "factors/opportunities/scan.py",
     "strategy/portfolio.py", "risk/risk_agent.py", "backtest/bt_runner.py",
+    "report/__init__.py", "report/daily_signal.py",   # ★2026-09-10 今日信号开源重实现（随源码分发）
     "ui_v2/pages/portal.html", "ui_v2/pages/pitch.html", "ui_v2/pages/holdings.html",
     "ui_v2/pages/factors.html", "ui_v2/pages/help.html", "ui_v2/pages/control.html",
     "harness/home/skills/backtest-acceptance/SKILL.md",
@@ -41,6 +42,9 @@ JSON_CHECKS = [
     ("output/harness_state.json", ["harness", "agent", "goal"]),
     ("output/timing_system.json", ["level", "score", "dims"]),
     ("output/traffic_light.json", ["state", "asof"]),
+    # ★2026-09-10 今日信号（report/daily_signal.py）：未生成属正常态（告警），生成后校验契约字段
+    ("output/daily_signal.json", ["date", "regime_level", "regime_cash_ratio",
+                                  "n_passed", "buy_order", "hold_plan", "gate", "advice"]),
 ]
 
 

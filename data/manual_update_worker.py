@@ -158,12 +158,12 @@ def run(ts: str):
 
         # 6.3) ★#351 今日信号（择时/审计）
         def s63():
-            # ★2026-09-09 修复：report/daily_signal.py 外包包未随源码分发 → 缺失明确跳过
+            # ★2026-09-10 daily_signal 已开源重实现（随源码分发）→ 缺失 = 文件被删，明确跳过并提示
             if (BASE / "report" / "daily_signal.py").exists():
                 dp.run_step("今日信号（择时/审计）",
                             [PY, "-X", "utf8", str(BASE / "report" / "daily_signal.py")], timeout=1800)
             else:
-                dp.log("  ⚠ 今日信号跳过（report/daily_signal.py 外包包未随源码分发）")
+                dp.log("  ⚠ 今日信号跳过（report/daily_signal.py 缺失，请恢复开源模块文件）")
         step("今日信号（择时/审计）", s63)
 
         # 6.4) ★#351 新择时系统（适合买入判断）

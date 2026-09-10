@@ -96,7 +96,7 @@ L1 因子参考 → 机会池/机器池(machine_pool)/竞价/turn_low 防守参�
 - 构建更新包：`scripts/build_update.py`（含脱敏替换规则）
 
 ### 5.4 gitignore 铁律（勿破坏）
-- 必须排除：`config/params.yaml`、`harness/home/.credentials.yaml`、`harness/node_modules/`、`harness/home/profiles/web/node_modules/`、`harness/home/profiles/node_modules/`（历史踩坑：漏排除曾暂存 2 万+ 文件）、`data/cache/ data/factorpool/ *.db *.sqlite *.parquet *.xlsx`、`logs/ output/ report/`、`deck/dashboard_*_20*.html deck/*.json`、`build/ dist/ *.spec updates/ backups/ /QuantDeck.exe`（>100MB 走 Release 附件）
+- 必须排除：`config/params.yaml`、`harness/home/.credentials.yaml`、`harness/node_modules/`、`harness/home/profiles/web/node_modules/`、`harness/home/profiles/node_modules/`（历史踩坑：漏排除曾暂存 2 万+ 文件）、`data/cache/ data/factorpool/ *.db *.sqlite *.parquet *.xlsx`、`logs/ output/ report/`（★2026-09-10 例外放行：`!report/__init__.py` `!report/daily_signal.py`——今日信号已开源重实现，其余看板生成器仍排除）、`deck/dashboard_*_20*.html deck/*.json`、`build/ dist/ *.spec updates/ backups/ /QuantDeck.exe`（>100MB 走 Release 附件）
 - 提交前检查：`git ls-files | wc` 应 ≈379；单文件 >50MB 必是漏配
 
 ### 5.5 常见操作
