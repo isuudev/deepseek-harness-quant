@@ -162,8 +162,11 @@ def fetch_day(pro, trade_date: str):
     #   ST 过滤静默失效）。优先用并行拉到的 daily_basic is_st；失败回退继承 bars 该股最近一条。
     try:
         if _db is not None and len(_db):
-            _st_map = dict(zip(_db["ts_code"], _db["is_st"].astype(int)))
-            out["is_st"] = out["code"].map(lambda c: _st_map.get(c, 0)).astype(int)
+            _st = _db["is_st"].map(lambda v: int(float(v.decode(errors="ignore")) if isinstance(v, bytes) else v) if v is not None and str(v) != "nan" else None)
+            if _st.notna().sum() == 0:
+                raise RuntimeError("daily_basic is_st 全空")
+            _st_map = dict(zip(_db["ts_code"], _st))
+            out["is_st"] = out["code"].map(lambda c: int(_st_map.get(c, 0)) if _st_map.get(c) == _st_map.get(c) else 0).astype(int)
         else:
             raise RuntimeError("daily_basic 空")
     except Exception as _e:

@@ -3126,6 +3126,17 @@ def live_data_assets() -> dict:
 _rt_cache = {"ts": 0.0, "data": None, "err": None}
 
 
+def _is_market_open() -> bool:
+    """A 股交易时段判定（工作日 + 9:30-11:30 / 13:00-15:00）。
+    节假日（工作日但不交易）不精确，仅用于前端「交易中/已收盘」展示。"""
+    import datetime as _dt
+    _now = _dt.datetime.now()
+    if _now.weekday() >= 5:
+        return False
+    _t = _now.hour * 60 + _now.minute
+    return (9 * 60 + 30 <= _t <= 11 * 60 + 30) or (13 * 60 <= _t <= 15 * 60)
+
+
 def live_realtime() -> dict:
     """盘中实时行情快照：涨跌家数/涨停数/成交额/涨跌幅分布/领涨领跌。
     数据源：新浪实时快照（akshare stock_zh_a_spot，60s 缓存）。
@@ -3133,10 +3144,11 @@ def live_realtime() -> dict:
     global _rt_cache
     import time as _t
     now = _t.time()
-    # 60s 缓存命中
+    # 60s 缓存命中（market_open 实时刷新，避免跨交易时段边界沿用旧值）
     if _rt_cache["data"] is not None and now - _rt_cache["ts"] < 60:
+        _rt_cache["data"]["market_open"] = _is_market_open()
         return _rt_cache["data"]
-    out = {"ok": True, "market_open": True,
+    out = {"ok": True, "market_open": _is_market_open(),
            "ts": datetime.now().strftime("%H:%M:%S"),
            "source": "sina_realtime"}
     try:
@@ -3194,6 +3206,7 @@ def live_realtime() -> dict:
             pass
         out.update({
             "n_stocks": int(len(df)),
+            "partial": int(len(df)) < 1000,   # ★样本远小于全市场（正常 5000+）→ 数据源残缺
             "up": up, "down": down, "flat": flat,
             "limit_up": limit_up, "limit_down": limit_down,
             "median_chg": round(med, 2),
@@ -3208,6 +3221,7 @@ def live_realtime() -> dict:
         _rt_cache["err"] = str(e)[:120]
         if _rt_cache["data"] is not None:
             out = dict(_rt_cache["data"])
+            out["market_open"] = _is_market_open()   # 返回缓存时用真实交易时段（不沿用缓存旧值）
             out["stale"] = True
             out["stale_ts"] = datetime.now().strftime("%H:%M:%S")
         else:

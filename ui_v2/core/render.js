@@ -76,12 +76,18 @@
   // ★#348 数据流通：otype/因子族/分类中文名从 /api/live/enums 动态下发（不写死）
   //   后端 registry + signal_family 动态构建，新类型/新因子自动出现，前端零改动
   var _enums = null;
+  var _enumsPromise = null;
   function loadEnums() {
     if (_enums) return Promise.resolve(_enums);
-    return fetch('/api/live/enums').then(function (r) { return r.json(); }).then(function (d) {
+    if (_enumsPromise) return _enumsPromise;   // 并发调用共享同一请求，避免重复 fetch
+    _enumsPromise = fetch('/api/live/enums').then(function (r) { return r.json(); }).then(function (d) {
       _enums = d || {};
       return _enums;
-    }).catch(function () { _enums = {}; return _enums; });
+    }).catch(function () {
+      _enumsPromise = null;   // 失败不缓存空对象，下次重试（否则颜色/中文名永久回退）
+      return {};
+    });
+    return _enumsPromise;
   }
   function _stripEmoji(s) {
     return String(s == null ? '' : s)

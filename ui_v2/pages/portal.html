@@ -182,7 +182,8 @@
   }
 
   // 门户 1 API 聚合（★#347 封装 loadPortal，60s 轮询）
-  function loadPortal() {
+  async function loadPortal() {
+  await R.loadEnums();   // ★#348 先确保 enums 就绪再渲染（否则四维颜色/类型中文名回退默认）
   LW.api.get('/api/live/portal_dash').then(function (d) {
     var tm = (d.timing && d.timing.timing) || {};
     var dd = d.data_date || (d.brief && d.brief.date) || (tm && tm.date) || '—';
@@ -497,7 +498,7 @@
         '<div style="display:flex;gap:20px;flex-wrap:wrap">' +
           '<span><span style="opacity:.7">中位涨幅 </span><b style="font-variant-numeric:tabular-nums">' + med + '%</b></span>' +
           '<span><span style="opacity:.7">平盘 </span><b>' + flat + '</b></span>' +
-          '<span><span style="opacity:.7">样本 </span><b>' + (d.n_stocks || 0) + '</b></span>' +
+          '<span><span style="opacity:.7">样本 </span><b>' + (d.n_stocks || 0) + '</b>' + (d.partial ? ' <span style="color:var(--gold)">（数据源残缺）</span>' : '') + '</span>' +
           '<span style="flex:1;text-align:right"><span style="opacity:.7">快照 ' + (d.ts || '') + (d.snap_time ? ' · ' + d.snap_time : '') + ' · </span>' + stat + stale + '</span>' +
         '</div>' +
         '<div style="margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px">' +
