@@ -56,6 +56,7 @@ python launcher.py
 | risk/ | 风控七道（数据审计 / 因子健康 / FRC 排雷 / Beneish / 竞价 / 单因子 / L0 门控） |
 | backtest/ | 回测引擎（T+1 开盘 / 一字板过滤 / 成本模型 / 结论分级） |
 | etf/ | ETF 映射（策略暴露 → 可交易配置） |
+| execution/ | 自动下单扩展边界（TODO，默认关闭，无真实委托） |
 | deck/ ui_v2/ | Web 决策台（9 页，前端零硬编码） |
 | harness/ | DeepSeek HARNESS 运行时（AI 控制台 / 牛散桥 / 动态插件） |
 | config/ | 策略注册表 / ETF 池 / 阈值，全部配置化 + .example 模板 |
@@ -92,15 +93,18 @@ python launcher.py
 
 ```bash
 # 源码
-pip install -r requirements.txt
-python data/demo/build_demo_db.py    # 生成演示数据
-python launcher.py                   # deck:8787 + HARNESS:3080
+python -m pip install -r requirements.txt
+cp config/params.yaml.example config/params.yaml   # 填入 Tushare token
+python data/fetch_stock_basic.py                   # 股票列表
+python data/bulk_loader.py                         # 历史日线（断点续传）
+python -X utf8 data/daily_pipeline.py              # 每日收盘后管道
+python launcher.py                                 # deck:8787 + HARNESS:3080
 
 # 单文件
-QuantDeck.exe                        # 双击即用，自动开浏览器
+QuantDeck.exe                                      # 双击即用，自动开浏览器
 
 # 完整包
-DSHQuant-v1.0.9-Release.zip          # 解压即用，含 HARNESS 运行时
+DSHQuant-v1.0.9-Release.zip                        # 解压即用，含 HARNESS 运行时
 ```
 
 > **下载注意**：从 Release 页 **Assets 区**下载 `DSHQuant-v1.0.9-Release.zip`（完整包，含 HARNESS 运行时）。
@@ -113,9 +117,11 @@ DSHQuant-v1.0.9-Release.zip          # 解压即用，含 HARNESS 运行时
 
 数据由用户自行获取。系统不分发数据。
 
-- 行情来自第三方（Tushare 等）。仓库只含获取脚本 + 合成演示数据。
+- 行情来自第三方（Tushare 等）。仓库只含获取脚本，不含真实行情或演示行情库。
 - 换手率 2019 年前缺失，2019 前换手类结论作废。
 - 配置：`config/params.yaml.example`（Tushare token）。
+- 数据源诊断：`python data/check_data_sources.py`（脱敏，检测 token 过期/缺失/网络问题）。
+- 自动下单：见 `docs/自动交易TODO.md`；当前没有券商委托能力，`/api/execution/status` 默认关闭。
 
 ## 许可
 

@@ -684,6 +684,31 @@ class Handler(BaseHTTPRequestHandler):
             files = sorted(_glob.glob(str(BASE / "deck" / "dashboard_live_*.html")), key=lambda x: Path(x).stat().st_mtime)
             p = Path(files[-1]) if files else BASE / "deck" / "dashboard_live.html"
             return self._send(200, p.read_bytes() if p.exists() else b"dashboard_live.html missing", "text/html; charset=utf-8")
+        if path == "/api/execution/status":
+            try:
+                from execution.broker_gateway import BrokerGateway
+                return self._send_json(BrokerGateway().status().as_dict())
+            except Exception as e:
+                return self._send_json({"enabled": False, "implemented": False,
+                                        "error": str(e)}, 500)
+        if path == "/api/strategy_health":
+            try:
+                f = BASE / "output" / "strategy_health.json"
+                if not f.exists():
+                    return self._send_json({"error": "策略健康文件不存在",
+                                            "hint": "运行 strategy/evolution_monitor.py"}, 404)
+                return self._send_json(json.loads(f.read_text(encoding="utf-8")))
+            except Exception as e:
+                return self._send_json({"error": str(e)}, 500)
+        if path == "/api/data_sources":
+            try:
+                f = BASE / "output" / "data_source_health.json"
+                if not f.exists():
+                    return self._send_json({"error": "数据源健康文件不存在",
+                                            "hint": "运行 data/check_data_sources.py"}, 404)
+                return self._send_json(json.loads(f.read_text(encoding="utf-8")))
+            except Exception as e:
+                return self._send_json({"error": str(e)}, 500)
         if path == "/api/tech_pitch":   # ★2026-08-10 科技突破 Pitch 池
             import glob as _glob
             files = sorted(_glob.glob(str(BASE / "logs" / "tech_pitch_*.json")), key=lambda x: Path(x).stat().st_mtime)

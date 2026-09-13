@@ -9,18 +9,18 @@
 `netstat -ano | findstr 8787` 找到占用进程，结束它或改端口：`python deck/deck_server.py --port 8888`。
 
 **Q3: 页面能开但数据全空？**
-数据目录未就绪。检查：`config/params.yaml` 的 `data.cache_dir` 或环境变量 `LWQUANT_CACHE_DIR` 是否指向含 `bars.db` 的目录；或先用演示数据模式（见快速开始 §5）。
+数据目录未就绪。检查：`config/params.yaml` 的 `data.cache_dir` 或环境变量 `LWQUANT_CACHE_DIR` 是否指向含 `bars.db` 的目录；首次使用请运行 `python data/fetch_stock_basic.py`、`python data/bulk_loader.py`，再跑 `python data/check_data_sources.py`。
 
 **Q4: EXE 双击后浏览器没自动打开？**
 手动打开 http://127.0.0.1:8787。若服务也未启动，检查 exe 同目录是否有 `data/`（或系统环境变量 `LWQUANT_CACHE_DIR` 指向数据目录）。
 
 ## 数据
 
-**Q5: fetch_data.py 需要什么？**
-Tushare token（`config/params.yaml` → `data.tushare_token`）。120 积分可拉日线+股票列表；财报/龙虎榜等需更高积分。akshare 免费接口免 token。
+**Q5: 每日数据需要什么？**
+日线增量使用 `data/incremental_daily_tushare.py`，需要 `config/params.yaml` → `data.tushare_token`。先运行 `python data/check_data_sources.py` 检查缺失、过期、权限或网络状态。历史日线也可用 `data/bulk_loader.py`（baostock，无需 token）。
 
 **Q6: 为什么仓库里没有数据？**
-Tushare 等数据源协议禁止再分发（详见 docs/数据说明.md）。请自行获取；`data/demo/` 提供合成演示数据。
+Tushare 等数据源协议禁止再分发（详见 docs/数据说明.md）。请自行获取；当前开源仓库不附带演示行情库。
 
 **Q7: 换手率（turn）2019 年前为什么缺失？**
 历史换手率数据源覆盖有限，2019 年起才 90%+ 覆盖。**请勿用 2019 前数据做换手类因子结论**（项目内所有 turn_low 结论均以 2019-2026 为验证区间）。

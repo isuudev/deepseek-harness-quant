@@ -24,7 +24,10 @@ SKIP_DIRS = {".venv", "node_modules", "__pycache__", "updates", "backups", "dist
 REQUIRED_FILES = [
     "launcher.py", "VERSION", "README.md", ".gitignore",
     "config/params.yaml.example", "config/strategies.yaml.example", "config/etf_pool.yaml.example",
-    "data/cache.py", "data/_platform.py",
+    "config/execution.yaml.example",
+    "data/cache.py", "data/_platform.py", "data/check_data_sources.py",
+    "data/factorpool/core/scheduler.py", "execution/broker_gateway.py",
+    "strategy/evolution_monitor.py",
     "deck/deck_server.py", "deck/system_live.py",
     "factors/factor_engine.py", "factors/opportunities/scan.py",
     "strategy/portfolio.py", "risk/risk_agent.py", "backtest/bt_runner.py",
@@ -45,6 +48,8 @@ JSON_CHECKS = [
     # ★2026-09-10 今日信号（report/daily_signal.py）：未生成属正常态（告警），生成后校验契约字段
     ("output/daily_signal.json", ["date", "regime_level", "regime_cash_ratio",
                                   "n_passed", "buy_order", "hold_plan", "gate", "advice"]),
+    ("output/data_source_health.json", ["ts", "tushare", "bars_latest", "needs_user_config"]),
+    ("output/strategy_health.json", ["latest_health", "n_factors", "auto_apply", "policy"]),
 ]
 
 

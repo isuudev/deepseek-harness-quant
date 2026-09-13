@@ -21,7 +21,11 @@ harness/home/quantapi*.json
 
 # ---- 数据（Tushare 协议：不得再分发；请自行获取） ----
 data/cache/
-data/factorpool/
+data/factorpool/*
+!data/factorpool/core/
+data/factorpool/core/*
+!data/factorpool/core/__init__.py
+!data/factorpool/core/scheduler.py
 data/trash/
 data_m_dir/
 data/minute/

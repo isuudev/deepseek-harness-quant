@@ -68,7 +68,7 @@ def _eval_time_series_factor(name: str) -> dict:
     return evaluate_time_series(name, series, mkt)
 
 
-def evaluate_factor(reg: FactorRegistry, f: dict) -> dict:
+def evaluate_factor(reg: FactorRegistry, f: dict, sample_limit=None) -> dict:
     """单因子评估 → 评分卡 → 状态流转"""
     kind = f["kind"]
     if kind == "time_series":
@@ -78,39 +78,60 @@ def evaluate_factor(reg: FactorRegistry, f: dict) -> dict:
         return res
     # cross_sectional：调 factor_evaluator（8 维体检）——通过子进程避免污染主进程
     import subprocess
-    r = subprocess.run(
-        [sys.executable, "-X", "utf8", str(BASE / "validation" / "factor_evaluator.py"),
-         "--factors", f["name"]],
-        capture_output=True, text=True, timeout=1800, encoding="utf-8", errors="replace")
+    cmd = [sys.executable, "-X", "utf8", str(BASE / "validation" / "factor_evaluator.py"),
+           "--factors", f["name"]]
+    if sample_limit:
+        cmd += ["--limit", str(int(sample_limit))]
+    r = subprocess.run(cmd, capture_output=True, text=True, timeout=1800,
+                       encoding="utf-8", errors="replace")
     out = (r.stdout or "")[-1500:]
     # 从输出解析评分（factor_evaluator 输出格式为评分卡；宽松解析 score 行）
     score = None
+    import re as _re
     for line in out.splitlines():
         if "总评" in line or "score" in line.lower() or "评分" in line:
-            try:
-                score = float(line.split(":")[-1].split("/")[0].strip())
+            m = _re.search(r"(?:评分|总评|score)\s*[:：]?\s*([0-9]+(?:\.[0-9]+)?)", line, _re.I)
+            if m:
+                score = float(m.group(1))
                 break
-            except ValueError:
-                continue
-    status = "active" if score and score >= 65 else ("candidate" if score and score >= 40 else "retired")
-    detail = {"stdout_tail": out, "score_parsed": score}
+    if score is None:
+        # 本地评价器只覆盖已实现因子；未注册/未产出分数时只留痕，绝不自动淘汰。
+        detail = {"stdout_tail": out, "score_parsed": None,
+                  "evaluation_status": "not_evaluable_local"}
+        reg.update_score(f["name"], None, status=None, detail=detail)
+        return detail
+    status = "active" if score >= 65 else ("candidate" if score >= 40 else "retired")
+    detail = {"stdout_tail": out, "score_parsed": score, "evaluation_status": "ok"}
     reg.update_score(f["name"], score, status=status, detail=detail)
     return detail
 
 
-def evaluate_pool(reg: FactorRegistry, only_candidate=False) -> list:
-    """测评全部 候选 + active（巡检）因子；★locked 因子（人工裁决）跳过自动评估"""
+def evaluate_pool(reg: FactorRegistry, only_candidate=False, limit=None, sample_limit=None) -> list:
+    """测评 候选 + active（巡检）因子；locked 因子跳过；limit 用于日频有界评估。"""
     todo = reg.list_factors(status="candidate") if only_candidate else \
         [f for f in reg.list_factors() if f["status"] in ("candidate", "active", "monitoring")]
     skipped = [f["name"] for f in todo if f.get("locked")]
     todo = [f for f in todo if not f.get("locked")]
+    try:
+        from factors.factor_engine import FACTOR_FUNCS
+        _evaluable = set(FACTOR_FUNCS)
+        # 已明确标记“本地无实现”的横截面因子不再每天空跑；有实现后去掉标记即可恢复。
+        todo = [f for f in todo if not (
+            f.get("kind") == "cross_sectional" and f["name"] not in _evaluable
+            and (f.get("last_eval_detail") or {}).get("evaluation_status") == "not_evaluable_local"
+        )]
+        todo.sort(key=lambda f: (f["name"] not in _evaluable, f.get("last_eval_at") or ""))
+    except Exception:
+        pass
+    if limit is not None and limit > 0:
+        todo = todo[:limit]
     print(f"待评估因子 {len(todo)} 个: {[f['name'] for f in todo]}" +
           (f"（跳过人工锁定 {len(skipped)} 个: {skipped}）" if skipped else ""))
     results = []
     for f in todo:
         print(f"\n=== 评估 {f['name']} ({f['kind']}) ===")
         try:
-            res = evaluate_factor(reg, f)
+            res = evaluate_factor(reg, f, sample_limit=sample_limit)
             if f["kind"] == "time_series":
                 print(f"  得分 {res['score']} → {res['status']} | IC_h1={res['ic_h1']} t={res['t_h1']} gap={res['gap_hl']}")
             results.append(res)

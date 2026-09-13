@@ -10,8 +10,8 @@ from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
 PY = sys.executable
-POOL_PY = r"<home>/.workbuddy/binaries/python/envs/default/Scripts/python.exe"
-POOL_DIR = Path(r"data/factorpool")
+POOL_PY = sys.executable
+POOL_DIR = BASE / "data" / "factorpool"
 
 def log(msg):
     print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
@@ -36,7 +36,8 @@ def main():
     log("=== 数据落地刷新链启动 ===")
     # 1) 因子池评分补跑（C5 连续验证第 3 天：bars 已到 08-10 → scheduler 幂等产出）
     run("因子池评分补跑（scheduler daily）",
-        [POOL_PY, "-X", "utf8", "core/scheduler.py", "daily"], cwd=POOL_DIR, timeout=1800)
+        [POOL_PY, "-X", "utf8", str(POOL_DIR / "core" / "scheduler.py"), "daily", "--allow-pipeline-lock"],
+        cwd=BASE, timeout=1800)
     # 2) 机会池全类型扫描（08-10）
     run("机会池扫描（全 7 类）",
         [PY, "-X", "utf8", str(BASE / "factors/opportunities/scan.py")], timeout=3600)

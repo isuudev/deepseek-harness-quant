@@ -14,7 +14,7 @@
 
 白名单（可更新范围）：
   deck/ factors/ strategy/ risk/ backtest/ etf/ ui_v2/ scripts/
-  data/*.py data/demo/build_demo_db.py config/*.example
+  data/*.py data/factorpool/core/*.py config/*.example
   harness/home/profiles/web/cordis.patch.yml harness/home/profiles/web/cordis.yml
   harness/home/profiles/web/plugins/ harness/home/skills/
   harness/install.cmd launcher.py main.py dev_auto.py
@@ -24,7 +24,7 @@
   config/params.yaml config/strategies.yaml config/etf_pool.yaml
   harness/home/.credentials.yaml harness/home/sessions/ harness/home/storages/
   harness/home/.anonymous-user-id data/cache/ data/factorpool/ data/trash/
-  data/demo/ logs/ output/ *.db *.parquet harness/node_modules/
+  data/cache/ data/factorpool/output/ logs/ output/ *.db *.parquet harness/node_modules/
 """
 import json
 import os
@@ -37,7 +37,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 ALLOW_ROOTS = (
-    "deck", "factors", "strategy", "risk", "backtest", "etf", "ui_v2", "scripts",
+    "deck", "factors", "strategy", "risk", "backtest", "etf", "ui_v2", "scripts", "execution",
     "docs", "harness/home/profiles/web/cordis.patch.yml",
     "harness/home/profiles/web/cordis.yml",
     "harness/home/profiles/web/plugins", "harness/home/skills",
@@ -50,9 +50,10 @@ ALLOW_FILES = (
 ALLOW_PREFIXES = ("data/", "config/")   # 仅允许 .example 与 data 下白名单文件
 PROTECT_PREFIXES = (
     "config/params.yaml", "config/strategies.yaml", "config/etf_pool.yaml",
+    "config/execution.yaml",
     "harness/home/.credentials.yaml", "harness/home/sessions",
     "harness/home/storages", "harness/home/.anonymous-user-id",
-    "data/cache", "data/factorpool", "data/trash", "data/demo",
+    "data/cache", "data/factorpool/output", "data/trash", "data/demo",
     "logs", "output", "harness/node_modules",
 )
 PROTECT_SUFFIXES = (".db", ".parquet", ".pyc")

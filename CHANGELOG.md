@@ -4,6 +4,12 @@
 
 - 今日信号开源重实现：`report/daily_signal.py`（L2 决策卡同源聚合，替代原外包包，补齐决策链「今日信号」环节）
 - 配置模板：`daily_signal` 段（params.yaml / params.yaml.example），改参数不改代码
+- 因子池本地 scheduler：manifest/health/daily_scores/UI 数据自动产出，支持有界评估与并发锁
+- 策略演进巡检：health 快照对比、IC 变化与暂停/重训建议（不自动改权重）
+- 数据源脱敏诊断：`data/check_data_sources.py`，可识别 token 过期/缺失/权限/网络问题
+- macOS 定时任务补齐：17:35 盘后、19:15 因子、每 4h 巡检，18:30/20:00 任务继续保留
+- 自动下单 TODO 边界：`config/execution.yaml.example` + `GET /api/execution/status`，默认关闭
+- 文档修复：移除已删除的 `fetch_data.py` / demo 脚本引用，统一到当前数据入口
 
 ## v1.0.9（2026-08-16）
 

@@ -380,7 +380,7 @@ def run_m3_trigger():
 
 # ---------------- 确定性更新（M1 管道就绪后启用） ----------------
 
-def run_update():
+def _run_update_impl():
     """确定性数据更新：数据审计（风控前置）+ 因子池巡检（挖→抓→测）"""
     log("== run_update ==")
     # 0) ★Deck 守护（2026-08-10：桌面门户自愈，挂了自动拉起）
@@ -421,6 +421,13 @@ def run_update():
         actives = [x for x in reg.list_factors(status="active")]
         log(f"因子池评估 {len(results)} 个，活跃因子 {len(actives)} 个: {[f['name'] for f in actives]}")
         write_report(reg)
+        try:
+            _revo = subprocess.run(
+                [sys.executable, "-X", "utf8", str(BASE / "strategy" / "evolution_monitor.py")],
+                capture_output=True, text=True, timeout=300, encoding="utf-8", errors="replace")
+            log(f"策略演进巡检: {( _revo.stdout or '').strip()[:200] or '无输出'}")
+        except Exception as _reve:
+            log(f"策略演进巡检失败: {_reve}")
     except Exception as e:
         log(f"因子池巡检失败: {e}")
     # 3) 每日信号（v3 口径）+ 看板（数据驱动版）
@@ -870,6 +877,38 @@ def run_update():
     log("数据更新: 本轮完成（审计 + 因子池 + 信号 + 看板 + Tushare 增量 + 模拟盘 + 指数增量 + 精选排名 + 动态择时 + 机会扫描 + Pitch Deck + 健康巡检）")
 
 
+def _acquire_shared_pipeline_lock() -> bool:
+    lock = BASE / "data" / "logs" / "daily_pipeline.lock"
+    try:
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        if lock.exists() and (time.time() - lock.stat().st_mtime) < 7200:
+            return False
+        lock.write_text(str(time.time()), encoding="utf-8")
+        return True
+    except Exception:
+        return True
+
+
+def _release_shared_pipeline_lock() -> None:
+    lock = BASE / "data" / "logs" / "daily_pipeline.lock"
+    try:
+        if lock.exists():
+            lock.unlink()
+    except Exception:
+        pass
+
+
+def run_update():
+    """共享 daily_pipeline 锁，避免 dev_auto 与 18:30 管道并发写产物。"""
+    if not _acquire_shared_pipeline_lock():
+        log("另一每日管道正在运行（共享锁未过期）→ dev_auto 本轮跳过确定性更新")
+        return
+    try:
+        return _run_update_impl()
+    finally:
+        _release_shared_pipeline_lock()
+
+
 def run_sched():
     """计划任务模式：熔断检查 → 更新 → 快照 → 生成 AI 待办"""
     log("== dev_auto --sched 启动 ==")
@@ -883,6 +922,12 @@ def run_sched():
         return
 
     errors = 0
+
+    # 周末只做笔记监控，不重复重算行情/因子（节假日暂按工作日处理，幂等无害）
+    if datetime.now().weekday() >= 5:
+        log("非交易日（周末）→ 跳过确定性更新，仅执行笔记监控")
+        run_notes_check()
+        return
 
     # ★熔断检查 1：连续无进展
     if _check_no_progress():

@@ -133,6 +133,8 @@ def main():
         log("非交易日（周末）→ 跳过每日管道（数据保持 bars.db 现有，下一交易日正常跑）")
         return
     log("=== 每日数据管道启动 ===")
+    # 数据源预检：token 过期/网络不通会被记录，但不阻断本地可重算部分
+    run_step("数据源健康预检", [PY, "-X", "utf8", str(BASE / "data" / "check_data_sources.py")], timeout=90)
     # 1) 分钟 7z 增量 → parquet（★2026-08-09 切换：minute.db 被系统锁 → 走 parquet 绕行方案，
     #    convert_7z_to_parquet.py 输出到 incr_parquet/，minute_reader fallback 读取；旧 ingest_minute_7z 保留待锁释放）
     #    ★2026-09-09 修复：目录不存在（7z 未下载/LWQUANT_MINUTE_DIR 未配置）时前置跳过——
@@ -205,10 +207,11 @@ def main():
         # ★2026-08-11 超时 1800→2700s：scheduler 全量补跑（60 因子全流程）可能 >30 分钟
         #   （08-10 事故中修复脚本单日截面重算即 18 分钟）；幂等跳过时几秒返回，无副作用
         run_step("因子池评分补跑（C5 保底）",
-                 [PY, "-X", "utf8", str(_sched), "daily"], timeout=2700)
+                 [PY, "-X", "utf8", str(_sched), "daily", "--allow-pipeline-lock"], timeout=2700)
     else:
         log("  ⚠ 外包因子池 scheduler 未接入（data/factorpool/core/scheduler.py 不存在，外包池未随源码分发）→ 跳过补跑；"
             "个股因子评分由 scan 本地口径兜底")
+    run_step("策略/因子演进巡检", [PY, "-X", "utf8", str(BASE / "strategy" / "evolution_monitor.py")], timeout=300)
     # 2.8) ★外包市场三件套（状态栏 温度/宽度/拥挤度）——外包池未随源码分发，2026-09 起由
     #     本地重构生成器从 bars.db 实算（data/factorpool/market_products.py，幂等同日覆盖）；
     #     ticker 60s 轮询 /api/live/timing_dash，产物落盘即亮起，无需重启服务

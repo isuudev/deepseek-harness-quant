@@ -277,6 +277,8 @@ factor_pool:
     active: 65                    # ≥65 分 → active（可接入策略）
     candidate: 40                 # 40-65 分 → candidate（观察）
   evaluate_on_sched: true         # dev_auto 每轮评估候选+巡检 active
+  daily_eval_limit: 1             # 每日有界评估候选数；full 模式才评估全部
+  daily_eval_sample_limit: 500    # 日频快速评估样本数；full 模式忽略
   fetch_on_sched: true            # 每轮刷新政策数据（EPU FRED 全量重下，量小）
   ts_eval_start: "<your-config>" # 时序因子评估起点（覆盖 2020-2025 回测 + 前段滚动窗口）
 

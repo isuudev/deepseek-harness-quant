@@ -54,7 +54,7 @@ def main():
         return
     log("=== 盘后机会扫描启动 ===")
     # 1) 因子池评分补跑（当日评分，供 scan ext_signal 消费；幂等）
-    _sched = Path(r"data/factorpool/core/scheduler.py")
+    _sched = BASE / "data" / "factorpool" / "core" / "scheduler.py"
     if _sched.exists():
         run_step("因子池评分补跑", [PY, "-X", "utf8", str(_sched), "daily"], timeout=2700)
     else:

@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.dshquant.after-close</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/Users/isuu/Projects/deepseek-harness-quant/.venv/bin/python</string>
+    <string>-u</string>
+    <string>-X</string><string>utf8</string>
+    <string>/Users/isuu/Projects/deepseek-harness-quant/data/after_close_scan.py</string>
+  </array>
+  <key>WorkingDirectory</key><string>/Users/isuu/Projects/deepseek-harness-quant</string>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>LWQUANT_CACHE_DIR</key><string>/Users/isuu/Projects/deepseek-harness-quant/data/cache</string>
+    <key>PATH</key><string>/Users/isuu/Projects/deepseek-harness-quant/.venv/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>17</integer><key>Minute</key><integer>35</integer>
+    <key>Weekday</key><array><integer>1</integer><integer>2</integer><integer>3</integer><integer>4</integer><integer>5</integer></array>
+  </dict>
+  <key>RunAtLoad</key><false/>
+  <key>StandardOutPath</key><string>/Users/isuu/Projects/deepseek-harness-quant/logs/launchd-after-close.out.log</string>
+  <key>StandardErrorPath</key><string>/Users/isuu/Projects/deepseek-harness-quant/logs/launchd-after-close.err.log</string>
+</dict>
+</plist>

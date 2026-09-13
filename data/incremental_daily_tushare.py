@@ -48,6 +48,11 @@ from data.cache import DailyCache, CACHE_DIR
 BARS_DB = str(CACHE_DIR / "bars.db")
 
 
+def _is_token_error(e: Exception) -> bool:
+    msg = str(e)
+    return "token已过期" in msg or "token 已过期" in msg or "token expired" in msg.lower()
+
+
 def latest_trade_date(pro=None) -> str:
     """服务器最新交易日（YYYYMMDD）；服务器盘后数据未出时返回空
     ★2026-08-14 修复：用单只股票轻量探测（ts_code 1 行，~0.5s）替代全市场 daily 查询——
@@ -68,10 +73,14 @@ def latest_trade_date(pro=None) -> str:
                 _one = _call(pro.daily, ts_code="000001.SZ", trade_date=d)
                 if _one is not None and len(_one) > 0:
                     return d
-            except Exception:
+            except Exception as e:
+                if _is_token_error(e):
+                    raise
                 continue
         return ""
-    except Exception:
+    except Exception as e:
+        if _is_token_error(e):
+            raise
         return ""
 
 
@@ -228,7 +237,14 @@ def main():
     pro = _pro()
     date = args.date
     if not date:
-        date = latest_trade_date(pro)
+        try:
+            date = latest_trade_date(pro)
+        except Exception as e:
+            if _is_token_error(e):
+                print("[tushare] token 已过期：请更新 config/params.yaml → data.tushare_token；"
+                      "运行 python data/check_data_sources.py 查看状态")
+                return 2
+            raise
         if not date:
             print(f"[tushare] 服务器最新交易日盘后数据未出（现在 {datetime.now():%H:%M}）→ 跳过（等 18:30 链自动重试）")
             return 0

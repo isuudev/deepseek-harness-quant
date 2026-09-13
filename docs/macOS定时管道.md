@@ -12,8 +12,13 @@
 | `com.dshquant.daily-pipeline.plist.example` | LWQuant-DailyPipeline | 每日 18:30 |
 | `com.dshquant.daily-report.plist.example` | DSHQuant-AIReview（自动选股+日报） | 工作日 20:00 |
 
-其余任务（after-close 17:35 / factor-daily 19:15 / devdriver 每 4h / deck-guard 每 30min）复制
-`daily-pipeline` 模板，按注释改 Label、ProgramArguments 与触发即可。
+仓库已提供 after-close 17:35 / factor-daily 19:15 / devdriver 每 4h 的实际 plist：
+
+- `deploy/macos/com.dshquant.after-close.plist`
+- `deploy/macos/com.dshquant.factor-daily.plist`
+- `deploy/macos/com.dshquant.devdriver.plist`
+
+执行项目根目录的 `安装定时任务.command` 会复制并加载 `deploy/macos/*.plist`。
 
 ## 2. 安装步骤
 

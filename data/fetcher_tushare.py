@@ -26,7 +26,13 @@ _MIN_INTERVAL = 0.05  # 主服务器宽松节流（实测单次 ~1s，此值仅�
 
 def _load_cfg():
     from data.config import load_params
-    return load_params().get("data", {})
+    cfg = dict(load_params().get("data", {}) or {})
+    # 环境变量优先，便于计划任务/CI 注入而不改本地 YAML。
+    if os.environ.get("TUSHARE_TOKEN"):
+        cfg["tushare_token"] = os.environ["TUSHARE_TOKEN"]
+    if os.environ.get("TUSHARE_API_URL"):
+        cfg["tushare_api_url"] = os.environ["TUSHARE_API_URL"]
+    return cfg
 
 
 def _pro():
@@ -72,6 +78,10 @@ def _call(fn, *args, max_retry=5, **kwargs):
             return fn(*args, **kwargs)
         except Exception as e:
             last_err = str(e)
+            if "token已过期" in last_err or "token 已过期" in last_err or "token expired" in last_err.lower():
+                raise RuntimeError(
+                    "Tushare token 已过期：请更新 config/params.yaml → data.tushare_token。"
+                    "可先运行 python data/check_data_sources.py 检查。")
             if "频率" in last_err or "每分钟" in last_err:
                 print(f"  [Tushare 限频] {last_err[:80]} → 等待 30s 重试")
                 time.sleep(30.0)

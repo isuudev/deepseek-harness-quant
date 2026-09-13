@@ -1,0 +1,10 @@
+# 自动下单扩展入口（当前为 TODO，未实现真实委托）
+# 使用：复制为 config/execution.yaml 后再按所选券商适配器修改。
+enabled: false
+provider: null          # 可选：qmt / minqmt / ptrade / official_api
+dry_run: true
+account_id: null
+adapter_module: null    # 例如 execution.adapters.qmt
+max_order_value: 0
+allow_market_order: false
+kill_switch_file: "logs/EXECUTION_STOP"
