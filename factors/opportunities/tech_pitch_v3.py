@@ -14,6 +14,10 @@
     - 情绪分 20：涨停次数 + 连板高度 + 换手活跃度（散户参与度代理）
     - 龙虎榜分 20：top_list 净买/机构席位（moneyflow_verify；夜间限流降级 0 分）
   输出：logs/tech_pitch_{ts}.json（与 v2 同规格，Deck/门户消费端不变）
+
+★板块口径（2026-10-14 用户裁决）：短线科技池只保留沪深主板（60/00 系）——
+  创业板/科创板/北交所/B股 不进入短线决策（cands 生成后硬过滤，与 scan.compute_factors 同口径）；
+  原 v2「创业板/科创板优先」规则同步推翻（徽章/排序加分已移除）。
 """
 import glob
 import json
@@ -196,11 +200,9 @@ def _name_map():
 def _industry_tag(code: str) -> str:
     """科技行业标签（v2 白名单复用，但仅作标注不拦截——短线情绪与行业无关）"""
     try:
-        from factors.opportunities.tech_pitch import _tech_industry, _board_badge
+        from factors.opportunities.tech_pitch import _tech_industry
         ind = _NAME_MAP.get(code, ("", ""))[1]
-        label = _tech_industry(ind)
-        board = _board_badge(code)
-        return f"{label or '非白名单'}·{board}" if board else (label or "非白名单")
+        return _tech_industry(ind) or "非白名单"
     except Exception:
         return ""
 
@@ -232,6 +234,9 @@ def build() -> Path:
     thr = feat["turn_mean"].quantile(0.97)
     hot = feat[feat["turn_mean"] > thr]
     cands = pd.concat([active, hot]).drop_duplicates(subset="code")
+    # ★板块口径（2026-10-14 用户裁决）：短线科技池同样只保留沪深主板（60/00 系）——
+    #   创业板/科创板/北交所/B股 不进入短线决策（与 scan.compute_factors 同口径）
+    cands = cands[cands["code"].str[:6].str.startswith(("60", "00"))]
     # ★2026-08-14 Pitch 改进规格 v2 ③：竞价反信号过滤（strength≥6 高开放量过热 → 回避）
     #   T-3 总指导裁决：竞价过热 1 日短效、5/20 日反转——短线追高无肉，直接剔除候选
     try:
@@ -348,7 +353,7 @@ def build() -> Path:
                            + ("；涨停次日高开诱多确认（>5% 出货信号，T+1 追入无肉）" if trap.get("trap") else "")
                            + "；实证 C9（外包 08-12）：短线 5 日买拥挤赛道股（高换手/高情绪/放量）全部负超额 -0.3~-0.7pp——只做反转不追高",
             "confidence": "中置信" if score >= 65 else "低置信",
-            "board": "创业板" if code.split(".")[0].startswith(("300", "301")) else ("科创板" if code.split(".")[0].startswith("688") else "主板"),
+            # ★2026-10-14：板块口径收紧为仅沪深主板，原 board 徽章字段移除（候选恒为主板，无区分意义）
             "tech_label": _industry_tag(code),
             "stop_plan": stop_plan,
             "add_date": now_date,

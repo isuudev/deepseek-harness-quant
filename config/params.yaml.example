@@ -237,6 +237,9 @@ strategy_v3:
   min_turnover_yi: 0.1          # 日均成交额下限 0.1 亿（流动性，保留）
   filter_delisted: true         # 剔除退市股（delisted_list.csv）
   filter_st: true               # 剔除 ST（2026-08-07 F-1 已修复）
+  # ★板块口径（2026-10-14 用户裁决）：决策只保留沪深主板（60/00 系）——
+  #   创业板(300/301)/科创板(688)/北交所/B股 不进入长线 Pitch 与短线科技池；
+  #   硬过滤在 scan.compute_factors 与 tech_pitch_v3 内（非配置项，改口径需改代码）
   rebalance_months: 3           # 季度调仓
   lookahead_note: "<your-config>"
 

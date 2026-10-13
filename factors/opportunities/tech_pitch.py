@@ -8,7 +8,8 @@
   1. ★科技行业白名单过滤：只收 C39 电子（半导体/消费电子/通信）/ I65 软件 / C38 电气（新能源电池）
      / C40 仪器仪表 / C35 专用设备（半导体设备）/ C37 航空航天军工
   2. ★排除非科技行业：J66 银行、C27 医药、F 批发零售、K70 房地产、C15 酒饮料等
-  3. ★创业板（300/301）+ 科创板（688）优先：同分排序靠前 + 徽章标记
+  3. ~~创业板（300/301）+ 科创板（688）优先~~（★2026-10-14 用户裁决推翻：决策只保留沪深主板，
+     板块过滤在 scan.compute_factors 单点收口，科技池候选源 opp_pool 已全为主板）
   4. ★字段补全到 Pitch 同规格：horizons 1/2/3 年回测 + Beneish + 风控 + 类型止损方案
      （供"科技/价值两池并列"的 Pitch 卡页面消费）
 
@@ -64,16 +65,6 @@ def _tech_industry(industry: str) -> str:
     return None
 
 
-def _board_badge(code: str) -> str:
-    """板块徽章：创业板/科创板/其他"""
-    c6 = code.split(".")[0]
-    if c6.startswith(("300", "301")):
-        return "创业板"
-    if c6.startswith("688"):
-        return "科创板"
-    return ""
-
-
 def load_latest() -> dict:
     files = sorted(glob.glob(str(BASE / "logs" / "tech_pitch_*.json")))
     if files:
@@ -104,7 +95,6 @@ def _enrich(c: dict) -> dict:
         "evidence": c.get("evidence", ""),
         "risk_notice": RISK_NOTICE.get(c["otype"], ""),
         "confidence": "中置信" if c["score"] >= 70 else "低置信",
-        "board": _board_badge(code),
     }
     # 回测证据（1/2/3 年）
     try:
@@ -154,7 +144,7 @@ def build(pool_file=None) -> Path:
         raise FileNotFoundError("无机会池文件")
     d = json.loads(Path(pool_file).read_text(encoding="utf-8"))
     ops = d.get("opportunities", [])
-    # ★v2：技术类 + 科技行业白名单过滤 + 板块优先
+    # ★v2：技术类 + 科技行业白名单过滤（板块口径 2026-10-14 起仅沪深主板，由 scan 面板收口）
     tech_ops = [o for o in ops if o["otype"] in TECH_TYPES]
     cands_all = []
     for o in tech_ops:
@@ -162,15 +152,14 @@ def build(pool_file=None) -> Path:
         if label is None:
             continue
         o["_tech_label"] = label
-        o["_board_pri"] = 0 if _board_badge(o["code"]) else 1   # 创业/科创优先
         cands_all.append(o)
-    # 分数 ≥ 独立门槛 → 排序（板块优先 → 分数）
+    # 分数 ≥ 独立门槛 → 按分数排序
     cands = sorted(
         [o for o in cands_all if o["score"] >= TECH_GLOBAL_THRESHOLD],
-        key=lambda x: (x["_board_pri"], -x["score"]))[:TECH_TOP_N]
+        key=lambda x: -x["score"])[:TECH_TOP_N]
     # 无候选时：科技行业 Top3 兜底（低置信）
     if not cands:
-        cands = sorted(cands_all, key=lambda x: (x["_board_pri"], -x["score"]))[:3]
+        cands = sorted(cands_all, key=lambda x: -x["score"])[:3]
     # NEW 监控
     prev = load_latest()
     prev_codes = {e["code"] for e in prev.get("entries", [])}
@@ -194,11 +183,11 @@ def build(pool_file=None) -> Path:
         "tech_filters": {
             "industries": TECH_INDUSTRIES,
             "exclude": list(NON_TECH_KEYWORDS),
-            "board_priority": "创业板(300)/科创板(688) 优先",
+            "board": "仅沪深主板（60/00 系，2026-10-14 用户裁决；scan 面板单点收口）",
         },
         "entries": entries,
         "note": "科技突破 Pitch 池 v2：breakout+pv_consensus · 科技行业白名单（半导体/软件/新能源/军工等）"
-                "· 排除银行/药业 · 创业板科创板优先；突破 17 年胜率 45.5% 需警惕追高；new=本次新增",
+                "· 排除银行/药业 · 仅沪深主板；突破 17 年胜率 45.5% 需警惕追高；new=本次新增",
     }
     p = BASE / "logs" / f"tech_pitch_{ts}.json"
     p.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
@@ -216,4 +205,4 @@ if __name__ == "__main__":
     print(f"科技突破 Pitch 池 v2: {p.name} | {len(d['entries'])} 只 | 新增 {len(d['new_codes'])} 只")
     for e in d["entries"]:
         print(f"  [{'NEW' if e['is_new'] else '  '}] {e['code']} {e['name']} "
-              f"{e['otype_name']} score={e['score']} | {e['tech_label']} {e['board']}")
+              f"{e['otype_name']} score={e['score']} | {e['tech_label']}")

@@ -43,12 +43,13 @@ def _pid_alive(pid: int) -> bool:
         return False
 
 
-def _auto_running() -> bool:
-    """自动程序（dev_auto / daily_pipeline）是否在运行（psutil 命令行扫描）
+def _auto_pids() -> list:
+    """运行中的自动程序（dev_auto / daily_pipeline）PID 列表（psutil 命令行扫描）
 
     ★2026-08-10 误伤防护：① 排除自身 pid ② 排除 python -c 调试进程
       （-c 命令行的字符串里可能包含关键词，不是真实管道）——只认脚本文件方式运行的管道
     """
+    pids = []
     try:
         import psutil
         me = os.getpid()
@@ -64,12 +65,45 @@ def _auto_running() -> bool:
                     continue  # 调试/内联脚本，非管道
                 cmd = " ".join(parts)
                 if any(s in cmd for s in AUTO_SCRIPTS):
-                    return True
+                    pids.append(p.pid)
             except Exception:
                 continue
     except Exception:
         pass
-    return False
+    return pids
+
+
+def _terminate_auto(pids) -> list:
+    """手动抢占：终止自动程序及其子进程（如 run_step 的 subprocess 子进程）
+    SIGTERM → 等 10s → 仍未退出的 SIGKILL。返回已终止的 PID 列表（供提示）。"""
+    import signal
+    import psutil
+    if not pids:
+        return []
+    procs = []
+    for pid in pids:
+        try:
+            _p = psutil.Process(pid)
+            procs.append(_p)
+            procs.extend(_p.children(recursive=True))
+        except Exception:
+            continue
+    for _p in procs:
+        try:
+            _p.send_signal(signal.SIGTERM)
+        except Exception:
+            pass
+    try:
+        psutil.wait_procs(procs, timeout=10)
+    except Exception:
+        pass
+    for _p in procs:
+        try:
+            if _p.is_running():
+                _p.kill()
+        except Exception:
+            pass
+    return pids
 
 
 def _latest_state() -> dict:
@@ -97,17 +131,21 @@ def check_busy():
     st = _latest_state()
     if st.get("status") == "running" and _pid_alive(st.get("pid")):
         return True, f"手动更新运行中（{st.get('started_at', '')} 启动）", st
-    # 2) 自动程序在跑
-    if _auto_running():
-        return True, "自动程序运行中（dev_auto / daily_pipeline），手动更新已自动禁用", {}
+    # 2) 自动程序在跑 → 不再拦截（★手动抢占优先：start() 会先终止自动程序再跑手动）
     return False, "", {}
 
 
 def start() -> dict:
-    """触发手动全域更新（busy 则拒绝；★O_EXCL 原子触发锁防并发双击/双实例）"""
+    """触发手动全域更新（★手动抢占优先：自动程序运行中则先终止；busy 仅限手动已跑/刚触发）"""
     busy, reason, _ = check_busy()
     if busy:
         return {"ok": False, "reason": reason}
+    # ★手动抢占：终止运行中的自动程序（dev_auto/daily_pipeline）再跑手动
+    auto_pids = _auto_pids()
+    auto_note = ""
+    if auto_pids:
+        _terminate_auto(auto_pids)
+        auto_note = f"（已终止自动程序 PID {','.join(map(str, auto_pids))}）"
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     # ★2026-08-10 加固：O_EXCL 原子创建触发锁——并发调用只有一个能成功（双实例/双击防护）
     lock = LOGS / f"mu_trigger_{ts}.lock"
@@ -126,7 +164,7 @@ def start() -> dict:
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         return {"ok": True, "ts": ts, "pid": p.pid,
-                "note": "手动全域更新已启动（后台完整管道：7z→parquet→日线→巡检→竞价信号→扫描→Pitch）"}
+                "note": "手动全域更新已启动" + auto_note + "（后台完整管道：7z→parquet→日线→巡检→竞价信号→扫描→Pitch）"}
     except Exception as e:
         return {"ok": False, "reason": f"启动失败: {str(e)[:80]}"}
 

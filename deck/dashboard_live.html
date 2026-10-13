@@ -55,7 +55,7 @@ td { padding:6px 8px; border-bottom:1px solid #14293f; font-size:12px; }
 </div>
 
 <div class="section">
-  <h2>🚀 手动全域更新 <span style="font-weight:400;font-size:11px;opacity:.6">自动程序失效时的补充 · 自动运行时自动禁用</span></h2>
+  <h2>🚀 手动全域更新 <span style="font-weight:400;font-size:11px;opacity:.6">自动程序失效时的补充 · 自动运行时自动接管</span></h2>
   <div id="mu-status" class="mu-status">检测中…</div>
   <div class="mu-row">
     <button id="mu-btn" class="mu-btn" onclick="manualUpdate()" disabled>启动手动全域更新</button>
@@ -148,7 +148,7 @@ async function muRefresh() {
   } catch (e) {}
 }
 async function manualUpdate() {
-  if (!confirm('确认启动手动全域更新？\n\n将执行完整管道：分钟数据→日线→巡检→竞价信号→机会扫描→Pitch（约 5-30 分钟）\n\n若自动程序正在运行，本操作会被自动拒绝。')) return;
+  if (!confirm('确认启动手动全域更新？\n\n将执行完整管道：分钟数据→日线→巡检→竞价信号→机会扫描→Pitch（约 5-30 分钟）\n\n若自动程序正在运行，会被自动终止后接管。')) return;
   const btn = document.getElementById('mu-btn');
   btn.disabled = true;
   btn.textContent = '启动中…';

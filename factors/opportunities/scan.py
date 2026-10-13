@@ -1633,6 +1633,10 @@ def compute_factors(px: pd.DataFrame, vx: pd.DataFrame, fin: pd.DataFrame,
     # 行业
     f = f.join(basic[["name", "industry"]], how="left")
     f["industry"] = f["industry"].fillna("未知")
+    # ★板块口径（2026-10-14 用户裁决）：决策只保留沪深主板（60/00 系）——
+    #   创业板(300/301)/科创板(688)/北交所/B股 一律不进入长线 Pitch 决策；
+    #   单点收口：本面板是 scan 全机会触发/评分/Pitch 候选的唯一数据源
+    f = f[f.index.str[:6].str.startswith(("60", "00"))]
     return f
 
 
